@@ -19,6 +19,11 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+try:
+    import stripe
+except Exception:  # pragma: no cover - stripe import is required in production
+    stripe = None
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 LANDING_DIR = BASE_DIR / "landing"
 DATA_DIR = BASE_DIR / "data"
@@ -48,7 +53,14 @@ RECEIPT_RATE_LIMIT_PER_MINUTE = int(os.getenv("RECEIPT_RATE_LIMIT_PER_MINUTE", "
 
 CORS_ALLOW_ORIGINS = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "*").split(",") if o.strip()]
 INDEXNOW_KEY = os.getenv("INDEXNOW_KEY", "").strip()
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+
+if stripe and STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+ACTIVE_ACCOUNT_STATUSES = {"active", "trialing"}
 
 
 class LeadRequest(BaseModel):
@@ -69,6 +81,10 @@ class ReceiptCreateRequest(BaseModel):
 
 class ReceiptVerifyRequest(BaseModel):
     receipt_id: str = Field(min_length=8, max_length=64)
+
+
+class AccessKeyRequest(BaseModel):
+    email: str
 
 
 app = FastAPI(title=APP_NAME, version="1.0.0")
@@ -129,6 +145,35 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS billing_accounts (
+                email TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                plan TEXT,
+                billing_mode TEXT,
+                stripe_customer_id TEXT,
+                stripe_subscription_id TEXT,
+                checkout_session_id TEXT,
+                current_period_end TEXT,
+                api_key_hash TEXT,
+                api_key_last4 TEXT,
+                last_event_id TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS billing_events (
+                event_id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """
+        )
 
 
 def client_ip(request: Request) -> str:
@@ -175,12 +220,15 @@ def sign_value(value: str) -> str:
     return hmac.new(RECEIPT_SIGNING_KEY.encode("utf-8"), value.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def send_resend_email(subject: str, html: str) -> None:
+def send_resend_email(subject: str, html: str, to_addresses: Optional[list[str]] = None) -> None:
     if not RESEND_API_KEY:
+        return
+    recipients = [a.strip().lower() for a in (to_addresses or [FOLLOWUP_INBOX_EMAIL]) if a and a.strip()]
+    if not recipients:
         return
     payload = {
         "from": FOLLOWUP_FROM_EMAIL,
-        "to": [FOLLOWUP_INBOX_EMAIL],
+        "to": recipients,
         "subject": subject,
         "html": html,
     }
@@ -195,6 +243,132 @@ def send_resend_email(subject: str, html: str) -> None:
             pass
     except urllib.error.URLError:
         return
+
+
+def normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def to_iso_from_unix(ts: Any) -> Optional[str]:
+    try:
+        if ts is None:
+            return None
+        return datetime.fromtimestamp(int(ts), tz=timezone.utc).isoformat()
+    except Exception:
+        return None
+
+
+def get_account_by_email(email: str) -> Optional[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM billing_accounts WHERE email = ?", (normalize_email(email),)).fetchone()
+
+
+def get_account_by_customer(customer_id: str) -> Optional[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM billing_accounts WHERE stripe_customer_id = ? ORDER BY updated_at DESC LIMIT 1",
+            (customer_id,),
+        ).fetchone()
+
+
+def get_account_by_subscription(subscription_id: str) -> Optional[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM billing_accounts WHERE stripe_subscription_id = ? ORDER BY updated_at DESC LIMIT 1",
+            (subscription_id,),
+        ).fetchone()
+
+
+def upsert_account(
+    *,
+    email: str,
+    status: Optional[str] = None,
+    plan: Optional[str] = None,
+    billing_mode: Optional[str] = None,
+    stripe_customer_id: Optional[str] = None,
+    stripe_subscription_id: Optional[str] = None,
+    checkout_session_id: Optional[str] = None,
+    current_period_end: Optional[str] = None,
+    last_event_id: Optional[str] = None,
+    rotate_api_key: bool = False,
+) -> Optional[str]:
+    email = normalize_email(email)
+    now = now_iso()
+    persisted_status = status or "pending"
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO billing_accounts (
+                email, created_at, updated_at, status, plan, billing_mode, stripe_customer_id,
+                stripe_subscription_id, checkout_session_id, current_period_end, last_event_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET
+                updated_at = excluded.updated_at,
+                status = COALESCE(excluded.status, billing_accounts.status),
+                plan = COALESCE(excluded.plan, billing_accounts.plan),
+                billing_mode = COALESCE(excluded.billing_mode, billing_accounts.billing_mode),
+                stripe_customer_id = COALESCE(excluded.stripe_customer_id, billing_accounts.stripe_customer_id),
+                stripe_subscription_id = COALESCE(excluded.stripe_subscription_id, billing_accounts.stripe_subscription_id),
+                checkout_session_id = COALESCE(excluded.checkout_session_id, billing_accounts.checkout_session_id),
+                current_period_end = COALESCE(excluded.current_period_end, billing_accounts.current_period_end),
+                last_event_id = COALESCE(excluded.last_event_id, billing_accounts.last_event_id)
+            """,
+            (
+                email,
+                now,
+                now,
+                persisted_status,
+                plan,
+                billing_mode,
+                stripe_customer_id,
+                stripe_subscription_id,
+                checkout_session_id,
+                current_period_end,
+                last_event_id,
+            ),
+        )
+        row = conn.execute("SELECT * FROM billing_accounts WHERE email = ?", (email,)).fetchone()
+        should_issue_key = rotate_api_key or (row and not row["api_key_hash"])
+        if not should_issue_key:
+            return None
+        raw_key = f"dwk_{secrets.token_urlsafe(24)}"
+        key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+        conn.execute(
+            "UPDATE billing_accounts SET api_key_hash = ?, api_key_last4 = ?, updated_at = ? WHERE email = ?",
+            (key_hash, raw_key[-4:], now, email),
+        )
+        return raw_key
+
+
+def resolve_email_for_event(obj: dict[str, Any]) -> Optional[str]:
+    customer_details = obj.get("customer_details") or {}
+    if customer_details.get("email"):
+        return normalize_email(customer_details["email"])
+    if obj.get("customer_email"):
+        return normalize_email(obj["customer_email"])
+    return None
+
+
+def ensure_webhook_configured() -> None:
+    if not stripe or not STRIPE_SECRET_KEY or not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Billing webhook is not configured")
+
+
+def require_paid_access(request: Request) -> sqlite3.Row:
+    api_key = request.headers.get("x-api-key", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Missing x-api-key")
+    key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT email, status, plan FROM billing_accounts WHERE api_key_hash = ?",
+            (key_hash,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    if row["status"] not in ACTIVE_ACCOUNT_STATUSES:
+        raise HTTPException(status_code=402, detail="Account is not active")
+    return row
 
 
 @app.middleware("http")
@@ -393,8 +567,152 @@ def create_lead(payload: LeadRequest, request: Request) -> dict[str, Any]:
     return {"ok": True, "lead_id": lead_id, "checkout_url": checkout_url, "plan": payload.plan}
 
 
+@app.post("/api/public/access-key")
+def request_access_key(payload: AccessKeyRequest, request: Request) -> dict[str, Any]:
+    ip = client_ip(request)
+    check_rate_limit(f"access-key:{ip}", 8, API_RATE_WINDOW_SECONDS)
+    email = normalize_email(payload.email)
+    if not EMAIL_RE.match(email):
+        raise HTTPException(status_code=400, detail="Invalid email")
+    row = get_account_by_email(email)
+    if row and row["status"] in ACTIVE_ACCOUNT_STATUSES:
+        new_key = upsert_account(email=email, rotate_api_key=True)
+        if new_key:
+            send_resend_email(
+                subject=f"{APP_NAME} access key issued",
+                html=(
+                    f"<p>Your {APP_NAME} account is active.</p>"
+                    f"<p><strong>API Key:</strong> <code>{new_key}</code></p>"
+                    f"<p>Use it in the <code>x-api-key</code> header for protected endpoints.</p>"
+                ),
+                to_addresses=[email],
+            )
+            send_resend_email(subject=f"{APP_NAME} key rotated", html=f"<p>API key rotated for {email}</p>")
+    return {"ok": True, "message": "If an active account exists, an access key email was sent."}
+
+
+@app.get("/v1/billing/status")
+def billing_status(email: str) -> dict[str, Any]:
+    email = normalize_email(email)
+    if not EMAIL_RE.match(email):
+        raise HTTPException(status_code=400, detail="Invalid email")
+    row = get_account_by_email(email)
+    if not row:
+        return {"ok": True, "found": False}
+    return {
+        "ok": True,
+        "found": True,
+        "email": row["email"],
+        "status": row["status"],
+        "plan": row["plan"],
+        "billing_mode": row["billing_mode"],
+        "current_period_end": row["current_period_end"],
+        "updated_at": row["updated_at"],
+    }
+
+
+@app.post("/v1/billing/webhook")
+async def billing_webhook(request: Request) -> dict[str, Any]:
+    ensure_webhook_configured()
+    payload = await request.body()
+    signature = request.headers.get("stripe-signature", "")
+    try:
+        event = stripe.Webhook.construct_event(payload=payload, sig_header=signature, secret=STRIPE_WEBHOOK_SECRET)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid webhook signature: {exc}") from exc
+
+    event_id = event.get("id")
+    event_type = event.get("type", "")
+    obj = event.get("data", {}).get("object", {}) or {}
+    now = now_iso()
+
+    with get_conn() as conn:
+        exists = conn.execute("SELECT 1 FROM billing_events WHERE event_id = ?", (event_id,)).fetchone()
+        if exists:
+            return {"ok": True, "duplicate": True}
+        conn.execute(
+            "INSERT INTO billing_events (event_id, created_at, event_type, payload) VALUES (?, ?, ?, ?)",
+            (event_id, now, event_type, json.dumps(event)),
+        )
+
+    if event_type == "checkout.session.completed":
+        email = resolve_email_for_event(obj)
+        if email:
+            mode = obj.get("mode") or "payment"
+            plan = "starter" if mode == "subscription" else "dfy"
+            status = "active" if (obj.get("payment_status") == "paid" or mode == "subscription") else "pending"
+            issued_key = upsert_account(
+                email=email,
+                status=status,
+                plan=plan,
+                billing_mode=mode,
+                stripe_customer_id=obj.get("customer"),
+                stripe_subscription_id=obj.get("subscription"),
+                checkout_session_id=obj.get("id"),
+                last_event_id=event_id,
+                rotate_api_key=status in ACTIVE_ACCOUNT_STATUSES,
+            )
+            if status in ACTIVE_ACCOUNT_STATUSES:
+                key_html = (
+                    f"<p><strong>API Key:</strong> <code>{issued_key}</code></p>"
+                    if issued_key
+                    else "<p>Your existing API key remains active.</p>"
+                )
+                send_resend_email(
+                    subject=f"{APP_NAME} access activated ({plan})",
+                    html=(
+                        f"<p>Payment received. Your {APP_NAME} account is now active.</p>"
+                        f"<p>Plan: <strong>{plan}</strong></p>{key_html}"
+                        f"<p>Use the <code>x-api-key</code> header on protected endpoints.</p>"
+                    ),
+                    to_addresses=[email],
+                )
+
+    elif event_type in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}:
+        customer_id = obj.get("customer")
+        sub_id = obj.get("id")
+        sub_status = obj.get("status", "inactive")
+        mapped = "active" if sub_status in ACTIVE_ACCOUNT_STATUSES else sub_status
+        row = get_account_by_customer(customer_id) if customer_id else None
+        email = row["email"] if row else None
+        if not email and customer_id and stripe:
+            try:
+                customer = stripe.Customer.retrieve(customer_id)
+                email = normalize_email(customer.get("email", "")) if customer else None
+            except Exception:
+                email = None
+        if email:
+            upsert_account(
+                email=email,
+                status=mapped,
+                billing_mode="subscription",
+                stripe_customer_id=customer_id,
+                stripe_subscription_id=sub_id,
+                current_period_end=to_iso_from_unix(obj.get("current_period_end")),
+                last_event_id=event_id,
+            )
+
+    elif event_type in {"invoice.paid", "invoice.payment_failed"}:
+        customer_id = obj.get("customer")
+        sub_id = obj.get("subscription")
+        row = get_account_by_subscription(sub_id) if sub_id else None
+        if not row and customer_id:
+            row = get_account_by_customer(customer_id)
+        if row:
+            upsert_account(
+                email=row["email"],
+                status="active" if event_type == "invoice.paid" else "past_due",
+                stripe_customer_id=customer_id,
+                stripe_subscription_id=sub_id,
+                last_event_id=event_id,
+            )
+
+    return {"ok": True}
+
+
 @app.post("/v1/receipts/create")
 def create_receipt(payload: ReceiptCreateRequest, request: Request) -> dict[str, Any]:
+    require_paid_access(request)
     ip = client_ip(request)
     check_rate_limit(f"receipt:{ip}", RECEIPT_RATE_LIMIT_PER_MINUTE, API_RATE_WINDOW_SECONDS)
 
@@ -454,7 +772,8 @@ def create_receipt(payload: ReceiptCreateRequest, request: Request) -> dict[str,
 
 
 @app.post("/v1/receipts/verify")
-def verify_receipt(payload: ReceiptVerifyRequest) -> dict[str, Any]:
+def verify_receipt(payload: ReceiptVerifyRequest, request: Request) -> dict[str, Any]:
+    require_paid_access(request)
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM receipts WHERE id = ?", (payload.receipt_id,)).fetchone()
         if not row:
@@ -477,7 +796,8 @@ def verify_receipt(payload: ReceiptVerifyRequest) -> dict[str, Any]:
 
 
 @app.get("/v1/receipts/{receipt_id}")
-def get_receipt(receipt_id: str) -> dict[str, Any]:
+def get_receipt(receipt_id: str, request: Request) -> dict[str, Any]:
+    require_paid_access(request)
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM receipts WHERE id = ?", (receipt_id,)).fetchone()
         if not row:
