@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Compliance Receipt Layer logo">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3ad9c7"/>
+      <stop offset="100%" stop-color="#79f29d"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="#0a1824"/>
+  <rect x="70" y="56" width="116" height="144" rx="16" fill="none" stroke="url(#g)" stroke-width="12"/>
+  <path d="M90 100h76M90 128h76M90 156h50" stroke="url(#g)" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="164" cy="176" r="16" fill="none" stroke="url(#g)" stroke-width="10"/>
+</svg>

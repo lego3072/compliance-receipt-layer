@@ -6,7 +6,67 @@
   <title>Compliance Receipt Layer | Signed Proof For Every Agent Action</title>
   <meta name="description" content="Create tamper-evident compliance receipts for every agent action with hash chaining and signature verification." />
   <meta name="keywords" content="compliance receipt api, ai audit trail, signed agent logs, tamper evident records" />
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+  <meta name="googlebot" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
   <link rel="canonical" href="{{BASE_URL}}/" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <meta property="og:title" content="Compliance Receipt Layer" />
+  <meta property="og:description" content="Signed, tamper-evident receipts for AI agent compliance actions." />
+  <meta property="og:url" content="{{BASE_URL}}/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Compliance Receipt Layer" />
+  <meta property="og:image" content="{{BASE_URL}}/logo.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Compliance Receipt Layer" />
+  <meta name="twitter:description" content="Immutable compliance receipts for agent-native workflows." />
+  <meta name="twitter:image" content="{{BASE_URL}}/logo.svg" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Compliance Receipt Layer",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "url": "{{BASE_URL}}/",
+    "description": "Create and verify signed receipts for AI agent actions.",
+    "provider": {
+      "@type": "Organization",
+      "name": "DataWeave INC"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How do we prove AI agent actions for audits?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Generate a signed receipt for each action and verify integrity before sharing outputs."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can receipts be verified later?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. You can validate any receipt by ID using the verify endpoint."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is this useful for SOC2, HIPAA, and GDPR controls?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. It provides tamper-evident evidence that supports policy and control traceability."
+        }
+      }
+    ]
+  }
+  </script>
   <style>
     :root{--bg:#070f18;--card:#122434;--line:#2a5872;--ink:#e9f7ff;--muted:#9fbfd1;--teal:#3ad9c7;--lime:#79f29d;--gold:#ffd58f}
     *{box-sizing:border-box} body{margin:0;font-family:ui-sans-serif,system-ui;background:radial-gradient(850px 420px at 90% -8%,rgba(58,217,199,.14),transparent 70%),radial-gradient(760px 430px at 0% 0%,rgba(255,213,143,.08),transparent 70%),var(--bg);color:var(--ink)}
@@ -21,6 +81,8 @@
     input,select,textarea{width:100%;padding:10px 11px;border-radius:10px;border:1px solid #2a5b75;background:#071824;color:var(--ink);font:inherit}
     pre{margin:0;white-space:pre-wrap;background:#061926;border:1px solid #295770;border-radius:10px;padding:10px;color:#d6ecf8}
     .footer{padding:18px 0 36px;color:var(--muted);font-size:13px}
+    .faq{padding-left:18px;margin:0}
+    .faq li{margin:0 0 8px}
     @media(max-width:900px){.hero{grid-template-columns:1fr}.form{grid-template-columns:1fr}}
   </style>
 </head>
@@ -68,8 +130,27 @@ GET  {{BASE_URL}}/v1/receipts/{receipt_id}</pre>
       <button id="create-btn" class="btn btn-ghost">Generate Demo</button>
       <pre id="demo-out" style="margin-top:10px">{}</pre>
     </section>
+
+    <section class="card" style="margin-top:12px">
+      <h3 style="margin:0 0 8px">Common AI/LLM Search Intents</h3>
+      <ul class="faq">
+        <li>how to build audit trail for AI agent actions</li>
+        <li>tamper-evident compliance receipt API</li>
+        <li>signed logs for AI compliance workflows</li>
+        <li>verify policy checks before AI output delivery</li>
+      </ul>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <h3 style="margin:0 0 8px">FAQ</h3>
+      <ul class="faq">
+        <li><strong>What is stored?</strong> Receipt metadata, hash chain state, and signatures for verification.</li>
+        <li><strong>Can we run this in daily workflows?</strong> Yes, receipts are designed for recurring agent actions.</li>
+        <li><strong>Is checkout mobile-ready?</strong> Yes, all checkout and onboarding entry points are mobile-first.</li>
+      </ul>
+    </section>
   </main>
-  <footer class="wrap footer">Compliance Receipt Layer by a DataWeaveAI company. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+  <footer class="wrap footer">Compliance Receipt Layer by a DataWeaveAI company. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="https://agent-checkout-relay-production.up.railway.app" target="_blank" rel="noreferrer">Checkout Relay</a> · <a href="https://agent-spend-guard-production.up.railway.app" target="_blank" rel="noreferrer">Spend Guard</a></footer>
 
   <script>
     const statusEl = document.getElementById('status');

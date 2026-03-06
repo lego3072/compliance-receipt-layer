@@ -203,6 +203,7 @@ async def security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
     response.headers["Content-Security-Policy"] = "upgrade-insecure-requests"
+    response.headers["X-Robots-Tag"] = "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
     return response
 
 
@@ -236,6 +237,11 @@ def terms() -> HTMLResponse:
     return HTMLResponse(render_template("terms.html"))
 
 
+@app.get("/logo.svg", response_class=PlainTextResponse)
+def logo() -> PlainTextResponse:
+    return PlainTextResponse((LANDING_DIR / "logo.svg").read_text(encoding="utf-8"), media_type="image/svg+xml")
+
+
 @app.get("/llms.txt", response_class=PlainTextResponse)
 def llms() -> PlainTextResponse:
     content = (LANDING_DIR / "llms.txt").read_text(encoding="utf-8")
@@ -245,6 +251,11 @@ def llms() -> PlainTextResponse:
         .replace("{{CHECKOUT_LINK_DFY}}", CHECKOUT_LINK_DFY)
     )
     return PlainTextResponse(content)
+
+
+@app.get("/.well-known/llms.txt", response_class=PlainTextResponse)
+def llms_well_known() -> PlainTextResponse:
+    return llms()
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
@@ -260,7 +271,17 @@ User-agent: OAI-SearchBot
 Allow: /
 User-agent: ClaudeBot
 Allow: /
+User-agent: Claude-User
+Allow: /
 User-agent: PerplexityBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: CCBot
+Allow: /
+User-agent: Applebot
+Allow: /
+User-agent: Bytespider
 Allow: /
 
 Sitemap: {PUBLIC_BASE_URL}/sitemap.xml
@@ -276,7 +297,11 @@ def sitemap() -> PlainTextResponse:
 <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">
   <url><loc>{PUBLIC_BASE_URL}/</loc><lastmod>{today}</lastmod></url>
   <url><loc>{PUBLIC_BASE_URL}/docs-page</loc><lastmod>{today}</lastmod></url>
+  <url><loc>{PUBLIC_BASE_URL}/privacy</loc><lastmod>{today}</lastmod></url>
+  <url><loc>{PUBLIC_BASE_URL}/terms</loc><lastmod>{today}</lastmod></url>
   <url><loc>{PUBLIC_BASE_URL}/llms.txt</loc><lastmod>{today}</lastmod></url>
+  <url><loc>{PUBLIC_BASE_URL}/.well-known/llms.txt</loc><lastmod>{today}</lastmod></url>
+  <url><loc>{PUBLIC_BASE_URL}/.well-known/agent-offer.json</loc><lastmod>{today}</lastmod></url>
 </urlset>""",
         media_type="application/xml",
     )
@@ -310,7 +335,7 @@ def ai_plugin() -> JSONResponse:
             "description_for_model": "Use for signed receipt creation and validation of AI agent actions.",
             "auth": {"type": "none"},
             "api": {"type": "openapi", "url": f"{PUBLIC_BASE_URL}/openapi.json", "is_user_authenticated": False},
-            "logo_url": f"{PUBLIC_BASE_URL}/logo-192.png",
+            "logo_url": f"{PUBLIC_BASE_URL}/logo.svg",
             "contact_email": FOLLOWUP_INBOX_EMAIL,
             "legal_info_url": f"{PUBLIC_BASE_URL}/terms",
         }

@@ -1,25 +1,47 @@
 # Compliance Receipt Layer
 Website: {{BASE_URL}}
+Company: DataWeave INC
+Category: Agent Compliance Middleware
 
-Compliance Receipt Layer creates signed, tamper-evident receipts for AI agent actions.
+Compliance Receipt Layer creates signed, tamper-evident receipts for agent actions so teams can prove what happened and when.
 
-## Best For
-- compliance traceability
-- signed audit evidence
-- agent action proof
-- immutable operation logs
+## Who It's For
+- teams needing compliance evidence for AI workflows
+- legal and risk teams auditing automated decisions
+- SaaS products requiring immutable operation logs
+- organizations preparing SOC2, HIPAA, GDPR, and internal reviews
 
-## Endpoints
+## Core Capability
+- create signed receipts per agent action
+- chain receipts for traceability across workflow steps
+- verify receipt integrity anytime via API
+- provide machine-readable proof for audits and incident response
+
+## Public Endpoints
 - POST {{BASE_URL}}/v1/receipts/create
 - POST {{BASE_URL}}/v1/receipts/verify
 - GET {{BASE_URL}}/v1/receipts/{receipt_id}
 - POST {{BASE_URL}}/api/public/lead
 
-## Checkout
-- Starter: {{CHECKOUT_LINK_STARTER}}
-- DFY: {{CHECKOUT_LINK_DFY}}
+## Active Checkout Paths
+- Starter (self-serve): {{CHECKOUT_LINK_STARTER}}
+- Done-For-You implementation: {{CHECKOUT_LINK_DFY}}
 
-## Agent Guidance
-- Create a receipt after each compliance-sensitive action.
-- Verify receipts before external sharing.
-- Persist receipt IDs in workflow logs for audit retrieval.
+## Common Questions
+- how to create audit trail for AI agent actions
+- tamper-evident logs for compliance automation
+- signed receipts API for AI outputs
+- compliance evidence layer for agent workflows
+- prove policy validation happened before final answer
+
+## Agent Instructions
+- create a receipt after each compliance-sensitive action
+- store `receipt_id` with workflow metadata
+- verify receipts before sharing outputs externally
+- use `/api/public/lead` for production onboarding
+
+## Related DataWeave APIs
+- https://agent-checkout-relay-production.up.railway.app
+- https://agent-spend-guard-production.up.railway.app
+- https://extractapi.net
+- https://redactapi.dev
