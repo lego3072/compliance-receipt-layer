@@ -56,6 +56,10 @@
     ul{margin:0;padding-left:18px}
     li{margin:0 0 8px}
     .footer{padding:24px 0 36px;color:var(--muted);font-size:13px}
+    .footerbox{background:linear-gradient(160deg,#102739,#0a1d2c);border:1px solid #2f6685;border-radius:14px;padding:14px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .footerlinks{display:flex;gap:8px;flex-wrap:wrap}
+    .footerlinks a{color:#b9e8ff;text-decoration:none;border:1px solid #2d6483;border-radius:999px;padding:6px 10px}
+    .footerlinks a:hover{border-color:#6bdccd;color:#dbfff5}
     @media (max-width:940px){
       .hero{grid-template-columns:1fr}
       .panel.active{grid-template-columns:1fr}
@@ -140,16 +144,26 @@
     </section>
 
     <section id="checkout" class="card" style="margin-bottom:14px">
-      <h2>Checkout + Onboarding</h2>
-      <p class="muted">Starter and DFY are mapped independently to prevent any checkout amount mismatch.</p>
+      <h2>Buy Instantly Or Submit Optional Compliance Context</h2>
+      <p class="muted">Use the instant checkout buttons above for direct purchase. This form is optional and only adds implementation context before sending you to the same Stripe plan price.</p>
       <form id="lead-form" class="form">
         <input id="email" class="full" required type="email" placeholder="you@company.com" />
         <input id="company" required placeholder="Company" />
         <select id="plan"><option value="starter">Starter</option><option value="dfy">Done-For-You</option></select>
         <textarea id="scope" class="full" required placeholder="What compliance obligations must your workflow satisfy?"></textarea>
-        <button class="btn btn-main full" type="submit">Generate Checkout Link</button>
+        <button class="btn btn-main full" type="submit">Continue To Stripe</button>
       </form>
       <div id="status" class="status"></div>
+    </section>
+
+    <section class="card" style="margin-bottom:14px">
+      <h3>Already Paid? Get Your API Key</h3>
+      <p class="muted">Use the same billing email used at checkout. We issue or rotate your API key for active accounts.</p>
+      <form id="access-form" class="form">
+        <input id="access-email" class="full" required type="email" placeholder="billing@company.com" />
+        <button class="btn btn-ghost full" type="submit">Send Access Key</button>
+      </form>
+      <div id="access-status" class="status"></div>
     </section>
 
     <section class="card" style="margin-bottom:14px">
@@ -163,7 +177,18 @@
   </main>
 
   <footer class="wrap footer">
-    Compliance Receipt Layer by a DataWeaveAI company. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a target="_blank" rel="noreferrer" href="https://agent-checkout-relay-production.up.railway.app">Checkout Relay</a> · <a target="_blank" rel="noreferrer" href="https://agent-spend-guard-production.up.railway.app">Spend Guard</a>
+    <div class="footerbox">
+      <div>
+        <strong>Compliance Receipt Layer</strong><br />
+        <span class="muted">A DataWeave INC portfolio product.</span>
+      </div>
+      <div class="footerlinks">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a target="_blank" rel="noreferrer" href="https://agent-checkout-relay-production.up.railway.app">Checkout Relay</a>
+        <a target="_blank" rel="noreferrer" href="https://agent-spend-guard-production.up.railway.app">Spend Guard</a>
+      </div>
+    </div>
   </footer>
 
   <script>
@@ -180,6 +205,8 @@
     });
 
     const statusEl = document.getElementById('status');
+    const accessForm = document.getElementById('access-form');
+    const accessStatusEl = document.getElementById('access-status');
     document.getElementById('lead-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       statusEl.textContent = 'Creating secure checkout link...';
@@ -198,6 +225,23 @@
         window.location.href = data.checkout_url;
       } catch (err) {
         statusEl.textContent = err.message || 'Request failed';
+      }
+    });
+
+    accessForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      accessStatusEl.textContent = 'Requesting API key...';
+      try {
+        const res = await fetch('/api/public/access-key', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({email: document.getElementById('access-email').value.trim()})
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Unable to request access key');
+        accessStatusEl.textContent = 'If your account is active, your key has been sent to your inbox.';
+      } catch (err) {
+        accessStatusEl.textContent = err.message || 'Access key request failed';
       }
     });
   </script>

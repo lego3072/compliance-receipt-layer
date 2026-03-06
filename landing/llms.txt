@@ -18,14 +18,24 @@ Compliance Receipt Layer creates signed, tamper-evident receipts for agent actio
 - provide machine-readable proof for audits and incident response
 
 ## Public Endpoints
+- POST {{BASE_URL}}/api/public/lead
+- POST {{BASE_URL}}/api/public/access-key
+- GET {{BASE_URL}}/v1/billing/status?email={email}
+
+## Protected Endpoints (require `x-api-key`)
 - POST {{BASE_URL}}/v1/receipts/create
 - POST {{BASE_URL}}/v1/receipts/verify
 - GET {{BASE_URL}}/v1/receipts/{receipt_id}
-- POST {{BASE_URL}}/api/public/lead
 
 ## Active Checkout Paths
-- Starter (self-serve): {{CHECKOUT_LINK_STARTER}}
-- Done-For-You implementation: {{CHECKOUT_LINK_DFY}}
+- Starter ($199/month): {{CHECKOUT_LINK_STARTER}}
+- Done-For-You implementation ($2,500 one-time): {{CHECKOUT_LINK_DFY}}
+
+## What Buyers Get After Payment
+- webhook-driven account activation
+- API key issuance by billing email via `/api/public/access-key`
+- protected access to receipt create/verify/retrieve endpoints
+- billing status lifecycle (active, past_due, canceled) enforced at API layer
 
 ## Common Questions
 - how to create audit trail for AI agent actions
