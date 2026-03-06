@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" role="img" aria-label="Compliance receipt ledger illustration">
+  <defs><linearGradient id="l" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#23bfa7"/><stop offset="100%" stop-color="#4ea2f4"/></linearGradient></defs>
+  <rect width="720" height="420" rx="28" fill="#f2efe7"/>
+  <rect x="52" y="40" width="420" height="332" rx="18" fill="#ffffff" stroke="#d7d0c3"/>
+  <text x="80" y="84" fill="#21313f" font-family="Arial" font-size="24">Action Receipt Ledger</text>
+  <path d="M80 108h360" stroke="#d9d6cf" stroke-width="4"/>
+  <path d="M80 142h220" stroke="#8a9aa7" stroke-width="10" stroke-linecap="round"/>
+  <path d="M80 172h300" stroke="#9eacb7" stroke-width="10" stroke-linecap="round"/>
+  <path d="M80 202h260" stroke="#8a9aa7" stroke-width="10" stroke-linecap="round"/>
+  <path d="M80 232h320" stroke="#9eacb7" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="552" cy="138" r="74" fill="none" stroke="url(#l)" stroke-width="12"/>
+  <text x="512" y="146" fill="#1f3f4d" font-family="Arial" font-size="20">Verified</text>
+  <rect x="498" y="236" width="168" height="112" rx="16" fill="#ffffff" stroke="#d7d0c3"/>
+  <text x="522" y="272" fill="#3a5060" font-family="Arial" font-size="18">Signature</text>
+  <path d="M522 300h120" stroke="#24bfa7" stroke-width="8" stroke-linecap="round"/>
+</svg>

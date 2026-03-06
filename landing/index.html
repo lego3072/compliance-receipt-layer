@@ -3,156 +3,182 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Compliance Receipt Layer | Signed Proof For Every Agent Action</title>
-  <meta name="description" content="Create tamper-evident compliance receipts for every agent action with hash chaining and signature verification." />
-  <meta name="keywords" content="compliance receipt api, ai audit trail, signed agent logs, tamper evident records" />
+  <title>Compliance Receipt Layer | Signed Proof For Every AI Action</title>
+  <meta name="description" content="Compliance Receipt Layer creates signed, tamper-evident receipts for AI agent actions so teams can prove compliance with confidence." />
+  <meta name="keywords" content="compliance receipt API, AI audit trail, signed workflow evidence, tamper-evident logs" />
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
-  <meta name="googlebot" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
   <link rel="canonical" href="{{BASE_URL}}/" />
   <link rel="icon" type="image/svg+xml" href="/logo.svg" />
   <meta property="og:title" content="Compliance Receipt Layer" />
-  <meta property="og:description" content="Signed, tamper-evident receipts for AI agent compliance actions." />
+  <meta property="og:description" content="Generate signed receipts and verify audit integrity for AI agent workflows." />
   <meta property="og:url" content="{{BASE_URL}}/" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Compliance Receipt Layer" />
   <meta property="og:image" content="{{BASE_URL}}/logo.svg" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Compliance Receipt Layer" />
-  <meta name="twitter:description" content="Immutable compliance receipts for agent-native workflows." />
+  <meta name="twitter:description" content="Tamper-evident receipts for agent-native operations." />
   <meta name="twitter:image" content="{{BASE_URL}}/logo.svg" />
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Compliance Receipt Layer",
-    "applicationCategory": "BusinessApplication",
-    "operatingSystem": "Web",
-    "url": "{{BASE_URL}}/",
-    "description": "Create and verify signed receipts for AI agent actions.",
-    "provider": {
-      "@type": "Organization",
-      "name": "DataWeave INC"
-    }
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "How do we prove AI agent actions for audits?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Generate a signed receipt for each action and verify integrity before sharing outputs."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Can receipts be verified later?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Yes. You can validate any receipt by ID using the verify endpoint."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Is this useful for SOC2, HIPAA, and GDPR controls?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Yes. It provides tamper-evident evidence that supports policy and control traceability."
-        }
-      }
-    ]
-  }
-  </script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Compliance Receipt Layer","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"{{BASE_URL}}/","description":"Signed receipt and verification layer for AI workflows.","provider":{"@type":"Organization","name":"DataWeave INC"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How can we prove an AI workflow step happened?","acceptedAnswer":{"@type":"Answer","text":"Create a signed receipt at each critical step and verify it by receipt ID anytime."}},{"@type":"Question","name":"Can this support SOC2 and GDPR audit evidence?","acceptedAnswer":{"@type":"Answer","text":"Yes, it is designed to provide machine-verifiable action evidence for compliance workflows."}}]}</script>
   <style>
-    :root{--bg:#070f18;--card:#122434;--line:#2a5872;--ink:#e9f7ff;--muted:#9fbfd1;--teal:#3ad9c7;--lime:#79f29d;--gold:#ffd58f}
-    *{box-sizing:border-box} body{margin:0;font-family:ui-sans-serif,system-ui;background:radial-gradient(850px 420px at 90% -8%,rgba(58,217,199,.14),transparent 70%),radial-gradient(760px 430px at 0% 0%,rgba(255,213,143,.08),transparent 70%),var(--bg);color:var(--ink)}
-    .wrap{max-width:1100px;margin:0 auto;padding:0 16px} nav{position:sticky;top:0;background:rgba(7,15,24,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);z-index:5}
-    .nav{display:flex;justify-content:space-between;align-items:center;min-height:62px;gap:8px}.brand{font-weight:800}.row{display:flex;gap:8px;flex-wrap:wrap}
-    .btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:10px;font-weight:700;border:1px solid transparent;color:inherit;text-decoration:none;cursor:pointer}
-    .btn-main{background:linear-gradient(135deg,var(--teal),var(--lime));color:#052118}.btn-ghost{border-color:var(--line);background:#112332}
-    .hero{padding:34px 0 18px;display:grid;grid-template-columns:1.15fr .85fr;gap:12px}.card{background:linear-gradient(160deg,#112434,#0c1f2c);border:1px solid var(--line);border-radius:15px;padding:16px}
-    h1{font-size:clamp(30px,5vw,50px);line-height:1.05;margin:0 0 10px}.muted{color:var(--muted)}
-    .chain{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#071927;border:1px solid #2b5f79;border-radius:10px;padding:10px;line-height:1.45;color:#cfe9f8}
-    .form{display:grid;grid-template-columns:1fr 1fr;gap:10px} .full{grid-column:1 / -1}
-    input,select,textarea{width:100%;padding:10px 11px;border-radius:10px;border:1px solid #2a5b75;background:#071824;color:var(--ink);font:inherit}
-    pre{margin:0;white-space:pre-wrap;background:#061926;border:1px solid #295770;border-radius:10px;padding:10px;color:#d6ecf8}
-    .footer{padding:18px 0 36px;color:var(--muted);font-size:13px}
-    .faq{padding-left:18px;margin:0}
-    .faq li{margin:0 0 8px}
-    @media(max-width:900px){.hero{grid-template-columns:1fr}.form{grid-template-columns:1fr}}
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Source+Serif+4:wght@600;700&display=swap');
+    :root{--bg:#f6f3ec;--ink:#1d2c38;--card:#ffffff;--line:#d7d0c3;--muted:#5f7181;--teal:#1bb79f;--blue:#4f98e5;--slate:#2f4a60}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:'Manrope',system-ui,sans-serif;background:radial-gradient(980px 460px at 95% -10%, rgba(27,183,159,.12), transparent 70%),radial-gradient(760px 420px at 0% 0%, rgba(79,152,229,.10), transparent 70%),var(--bg);color:var(--ink)}
+    .wrap{max-width:1180px;margin:0 auto;padding:0 18px}
+    nav{position:sticky;top:0;z-index:12;background:rgba(246,243,236,.88);backdrop-filter:blur(10px);border-bottom:1px solid #dcd4c8}
+    .nav{min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .brand{display:flex;align-items:center;gap:10px;font:700 1.08rem 'Source Serif 4',serif}
+    .brand img{width:28px;height:28px}
+    .navlinks{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 15px;border-radius:12px;border:1px solid transparent;text-decoration:none;color:inherit;font-weight:700;cursor:pointer}
+    .btn-main{background:linear-gradient(135deg,var(--teal),var(--blue));color:#f5fffd}
+    .btn-ghost{background:#fff;border-color:#c9d2db}
+    .hero{padding:34px 0 18px;display:grid;grid-template-columns:1.04fr .96fr;gap:14px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 8px 28px rgba(18,35,52,.05)}
+    h1{font-family:'Source Serif 4',serif;font-size:clamp(32px,5vw,54px);line-height:1.03;margin:0 0 10px;color:#142432}
+    .muted{color:var(--muted)}
+    .heroimg{width:100%;display:block;border-radius:12px;border:1px solid #d6d0c4}
+    .pricing{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+    .pbox{border:1px solid #d8d1c5;border-radius:12px;padding:12px;background:#fbf9f4}
+    .price{font-size:30px;font-weight:800;color:var(--slate);line-height:1}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .tabbtn{border:1px solid #c6d0d8;background:#fff;color:#365066;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
+    .tabbtn.active{background:linear-gradient(135deg,#dff9f3,#dbe9fb);border-color:#90c7bb;color:#143947}
+    .panel{display:none}
+    .panel.active{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:center}
+    .panel img{width:100%;border-radius:12px;border:1px solid #d2cabe;background:#fff}
+    .form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .full{grid-column:1/-1}
+    input,select,textarea{width:100%;background:#fff;border:1px solid #cdd6de;color:#1f3342;border-radius:10px;padding:11px 12px;font:inherit}
+    textarea{min-height:106px;resize:vertical}
+    .status{margin-top:8px;font-size:13px;color:#2f7f68}
+    ul{margin:0;padding-left:18px}
+    li{margin:0 0 8px}
+    .footer{padding:24px 0 36px;color:var(--muted);font-size:13px}
+    @media (max-width:940px){
+      .hero{grid-template-columns:1fr}
+      .panel.active{grid-template-columns:1fr}
+      .form{grid-template-columns:1fr}
+      .pricing{grid-template-columns:1fr}
+    }
   </style>
 </head>
 <body>
-  <nav><div class="wrap nav"><div class="brand">Compliance Receipt Layer</div><div class="row"><a class="btn btn-ghost" href="/docs-page">API Docs</a><a class="btn btn-main" href="#buy">Start</a></div></div></nav>
+  <nav>
+    <div class="wrap nav">
+      <div class="brand"><img src="/logo.svg" alt="Receipt Layer logo" />Compliance Receipt Layer</div>
+      <div class="navlinks">
+        <a class="btn btn-ghost" href="/docs-page">API Docs</a>
+        <a class="btn btn-main" href="#checkout">Start</a>
+      </div>
+    </div>
+  </nav>
+
   <main class="wrap">
     <section class="hero">
       <article class="card">
-        <h1>Signed Proof For Every <span style="color:var(--teal)">Agent Action</span></h1>
-        <p class="muted">Generate immutable compliance receipts with hash chaining and HMAC signatures. Verify any receipt instantly for audits, legal reviews, and trust reporting.</p>
-        <div class="row"><a target="_blank" rel="noreferrer" class="btn btn-main" href="{{CHECKOUT_LINK_DFY}}">DFY Compliance Setup</a><a target="_blank" rel="noreferrer" class="btn btn-ghost" href="{{CHECKOUT_LINK_STARTER}}">Start Starter</a></div>
+        <h1>Signed Evidence For Every Critical AI Workflow Step</h1>
+        <p class="muted">When legal, risk, or enterprise buyers ask for proof, this layer returns verifiable receipts with tamper-evident integrity and retrieval by receipt ID.</p>
+        <div class="pricing">
+          <div class="pbox"><div class="muted">Starter</div><div class="price">$199</div><div class="muted">monthly</div></div>
+          <div class="pbox"><div class="muted">DFY Implementation</div><div class="price">$2.5k</div><div class="muted">one-time</div></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <a class="btn btn-main" target="_blank" rel="noreferrer" href="{{CHECKOUT_LINK_STARTER}}">Starter Checkout</a>
+          <a class="btn btn-ghost" target="_blank" rel="noreferrer" href="{{CHECKOUT_LINK_DFY}}">DFY Checkout</a>
+        </div>
       </article>
       <aside class="card">
-        <div class="chain">event_001 -> receipt_hash_a9... -> sig_98...
-event_002 -> receipt_hash_b1... -> sig_11...
-event_003 -> receipt_hash_c2... -> sig_7e...
-
-verify(receipt_id) => signature_valid: true</div>
-        <p class="muted" style="margin:10px 0 0">Designed for agent-native compliance pipelines and regulator-friendly traceability.</p>
+        <img class="heroimg" src="/assets/hero-ledger.svg" alt="Compliance receipt ledger" />
       </aside>
     </section>
 
-    <section id="buy" class="card" style="margin-bottom:12px">
-      <h2 style="margin:0 0 8px">Checkout + Onboarding</h2>
+    <section class="card" style="margin-bottom:14px">
+      <h2>Evidence Surfaces (Visual Tabs)</h2>
+      <div class="tabs">
+        <button class="tabbtn active" data-tab="audit">Audit Trails</button>
+        <button class="tabbtn" data-tab="legal">Legal Review</button>
+        <button class="tabbtn" data-tab="ops">Ops Controls</button>
+      </div>
+      <div class="panel active" data-panel="audit">
+        <img src="/assets/tab-audit.svg" alt="Audit evidence tab" />
+        <div>
+          <h3>Audit-Ready Record Chains</h3>
+          <p class="muted">Receipt chaining provides sequence-aware proof of actions and validations in your agent workflow.</p>
+          <ul>
+            <li>Immutable receipt IDs per event</li>
+            <li>Signature validation endpoint</li>
+            <li>Traceable chronology for compliance teams</li>
+          </ul>
+        </div>
+      </div>
+      <div class="panel" data-panel="legal">
+        <img src="/assets/tab-legal.svg" alt="Legal proof tab" />
+        <div>
+          <h3>Legal and Risk Evidence</h3>
+          <p class="muted">Reduce disputes with machine-verifiable records showing what was executed and when.</p>
+          <ul>
+            <li>Signed output hashes</li>
+            <li>Policy-tag metadata support</li>
+            <li>Retrieval by receipt ID</li>
+          </ul>
+        </div>
+      </div>
+      <div class="panel" data-panel="ops">
+        <img src="/assets/tab-ops.svg" alt="Ops traceability tab" />
+        <div>
+          <h3>Ops-Level Workflow Traceability</h3>
+          <p class="muted">Use receipts in incident response, customer assurance packages, and internal governance reviews.</p>
+          <ul>
+            <li>API-friendly workflow integration</li>
+            <li>Fast create + verify loop</li>
+            <li>Supports recurring daily operations</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="checkout" class="card" style="margin-bottom:14px">
+      <h2>Checkout + Onboarding</h2>
+      <p class="muted">Starter and DFY are mapped independently to prevent any checkout amount mismatch.</p>
       <form id="lead-form" class="form">
-        <input class="full" id="email" required type="email" placeholder="you@company.com" />
+        <input id="email" class="full" required type="email" placeholder="you@company.com" />
         <input id="company" required placeholder="Company" />
         <select id="plan"><option value="starter">Starter</option><option value="dfy">Done-For-You</option></select>
-        <textarea id="scope" class="full" required placeholder="What compliance obligations do you need receipts for?"></textarea>
-        <button class="btn btn-main full" type="submit">Get Checkout Link</button>
+        <textarea id="scope" class="full" required placeholder="What compliance obligations must your workflow satisfy?"></textarea>
+        <button class="btn btn-main full" type="submit">Generate Checkout Link</button>
       </form>
-      <div id="status" class="muted" style="margin-top:8px"></div>
-      <p class="muted" style="margin:8px 0 0;font-size:13px">Checkout options are limited to active Stripe links to avoid price/plan mismatches.</p>
+      <div id="status" class="status"></div>
     </section>
 
-    <section class="card" style="margin-bottom:12px">
-      <h3 style="margin:0 0 8px">API Quickstart</h3>
-      <pre>POST {{BASE_URL}}/v1/receipts/create
-POST {{BASE_URL}}/v1/receipts/verify
-GET  {{BASE_URL}}/v1/receipts/{receipt_id}</pre>
-    </section>
-
-    <section class="card">
-      <h3 style="margin:0 0 8px">Create Demo Receipt</h3>
-      <button id="create-btn" class="btn btn-ghost">Generate Demo</button>
-      <pre id="demo-out" style="margin-top:10px">{}</pre>
-    </section>
-
-    <section class="card" style="margin-top:12px">
-      <h3 style="margin:0 0 8px">Common AI/LLM Search Intents</h3>
-      <ul class="faq">
-        <li>how to build audit trail for AI agent actions</li>
-        <li>tamper-evident compliance receipt API</li>
-        <li>signed logs for AI compliance workflows</li>
-        <li>verify policy checks before AI output delivery</li>
-      </ul>
-    </section>
-
-    <section class="card" style="margin-top:12px">
-      <h3 style="margin:0 0 8px">FAQ</h3>
-      <ul class="faq">
-        <li><strong>What is stored?</strong> Receipt metadata, hash chain state, and signatures for verification.</li>
-        <li><strong>Can we run this in daily workflows?</strong> Yes, receipts are designed for recurring agent actions.</li>
-        <li><strong>Is checkout mobile-ready?</strong> Yes, all checkout and onboarding entry points are mobile-first.</li>
+    <section class="card" style="margin-bottom:14px">
+      <h3>Security + Integrity</h3>
+      <ul>
+        <li>Signature-based receipt verification</li>
+        <li>Rate-limited public endpoints</li>
+        <li>Strict response security headers</li>
       </ul>
     </section>
   </main>
-  <footer class="wrap footer">Compliance Receipt Layer by a DataWeaveAI company. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="https://agent-checkout-relay-production.up.railway.app" target="_blank" rel="noreferrer">Checkout Relay</a> · <a href="https://agent-spend-guard-production.up.railway.app" target="_blank" rel="noreferrer">Spend Guard</a></footer>
+
+  <footer class="wrap footer">
+    Compliance Receipt Layer by a DataWeaveAI company. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a target="_blank" rel="noreferrer" href="https://agent-checkout-relay-production.up.railway.app">Checkout Relay</a> · <a target="_blank" rel="noreferrer" href="https://agent-spend-guard-production.up.railway.app">Spend Guard</a>
+  </footer>
 
   <script>
+    const tabButtons = document.querySelectorAll('.tabbtn');
+    const panels = document.querySelectorAll('.panel');
+    tabButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach((b) => b.classList.remove('active'));
+        panels.forEach((p) => p.classList.remove('active'));
+        btn.classList.add('active');
+        const panel = document.querySelector(`.panel[data-panel="${btn.dataset.tab}"]`);
+        if (panel) panel.classList.add('active');
+      });
+    });
+
     const statusEl = document.getElementById('status');
     document.getElementById('lead-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -172,22 +198,6 @@ GET  {{BASE_URL}}/v1/receipts/{receipt_id}</pre>
         window.location.href = data.checkout_url;
       } catch (err) {
         statusEl.textContent = err.message || 'Request failed';
-      }
-    });
-
-    document.getElementById('create-btn').addEventListener('click', async () => {
-      const out = document.getElementById('demo-out');
-      out.textContent = 'Creating receipt...';
-      try {
-        const res = await fetch('/v1/receipts/create', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({actor_id:'demo-agent',action_type:'policy_validation',output:'sample compliance output',policy_tags:['gdpr','soc2'],metadata:{source:'web_demo'}})
-        });
-        const data = await res.json();
-        out.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        out.textContent = JSON.stringify({error:'Failed to create receipt'}, null, 2);
       }
     });
   </script>
