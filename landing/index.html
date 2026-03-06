@@ -48,11 +48,12 @@ verify(receipt_id) => signature_valid: true</div>
       <form id="lead-form" class="form">
         <input class="full" id="email" required type="email" placeholder="you@company.com" />
         <input id="company" required placeholder="Company" />
-        <select id="plan"><option value="starter">Starter</option><option value="pro">Pro</option><option value="scale">Scale</option><option value="dfy">Done-For-You</option></select>
+        <select id="plan"><option value="starter">Starter</option><option value="dfy">Done-For-You</option></select>
         <textarea id="scope" class="full" required placeholder="What compliance obligations do you need receipts for?"></textarea>
         <button class="btn btn-main full" type="submit">Get Checkout Link</button>
       </form>
       <div id="status" class="muted" style="margin-top:8px"></div>
+      <p class="muted" style="margin:8px 0 0;font-size:13px">Checkout options are limited to active Stripe links to avoid price/plan mismatches.</p>
     </section>
 
     <section class="card" style="margin-bottom:12px">

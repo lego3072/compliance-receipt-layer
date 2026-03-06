@@ -39,8 +39,6 @@ DATAWEAVE_HOME_URL = os.getenv("DATAWEAVE_HOME_URL", "https://dataweaveai.com").
 AGENT_ROUTER_URL = os.getenv("AGENT_ROUTER_URL", "https://get-agent-router.com").strip()
 
 CHECKOUT_LINK_STARTER = os.getenv("CHECKOUT_LINK_STARTER", "https://buy.stripe.com/cNidR9bpT0284Or8nf3Je04").strip()
-CHECKOUT_LINK_PRO = os.getenv("CHECKOUT_LINK_PRO", "https://buy.stripe.com/cNidR9bpT0284Or8nf3Je04").strip()
-CHECKOUT_LINK_SCALE = os.getenv("CHECKOUT_LINK_SCALE", "https://buy.stripe.com/cNidR9bpT0284Or8nf3Je04").strip()
 CHECKOUT_LINK_DFY = os.getenv("CHECKOUT_LINK_DFY", "https://buy.stripe.com/cNi14n0Lf8yEep1dHz3Je05").strip()
 
 API_RATE_WINDOW_SECONDS = int(os.getenv("API_RATE_WINDOW_SECONDS", "60"))
@@ -55,7 +53,7 @@ class LeadRequest(BaseModel):
     email: str
     company: str = Field(min_length=2, max_length=120)
     compliance_scope: str = Field(min_length=4, max_length=300)
-    plan: str = Field(default="starter", pattern="^(starter|pro|scale|dfy)$")
+    plan: str = Field(default="starter", pattern="^(starter|dfy)$")
     source: Optional[str] = Field(default="site", max_length=80)
 
 
@@ -155,8 +153,6 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> None:
 def checkout_link_for_plan(plan: str) -> str:
     return {
         "starter": CHECKOUT_LINK_STARTER,
-        "pro": CHECKOUT_LINK_PRO,
-        "scale": CHECKOUT_LINK_SCALE,
         "dfy": CHECKOUT_LINK_DFY,
     }.get(plan, CHECKOUT_LINK_STARTER)
 
@@ -168,8 +164,6 @@ def render_template(name: str) -> str:
         .replace("{{DATAWEAVE_HOME_URL}}", DATAWEAVE_HOME_URL)
         .replace("{{AGENT_ROUTER_URL}}", AGENT_ROUTER_URL)
         .replace("{{CHECKOUT_LINK_STARTER}}", CHECKOUT_LINK_STARTER)
-        .replace("{{CHECKOUT_LINK_PRO}}", CHECKOUT_LINK_PRO)
-        .replace("{{CHECKOUT_LINK_SCALE}}", CHECKOUT_LINK_SCALE)
         .replace("{{CHECKOUT_LINK_DFY}}", CHECKOUT_LINK_DFY)
     )
 
