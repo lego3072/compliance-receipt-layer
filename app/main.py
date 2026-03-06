@@ -46,6 +46,7 @@ LEAD_RATE_LIMIT_PER_MINUTE = int(os.getenv("LEAD_RATE_LIMIT_PER_MINUTE", "15"))
 RECEIPT_RATE_LIMIT_PER_MINUTE = int(os.getenv("RECEIPT_RATE_LIMIT_PER_MINUTE", "120"))
 
 CORS_ALLOW_ORIGINS = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "*").split(",") if o.strip()]
+INDEXNOW_KEY = os.getenv("INDEXNOW_KEY", "").strip()
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -256,6 +257,13 @@ def llms() -> PlainTextResponse:
 @app.get("/.well-known/llms.txt", response_class=PlainTextResponse)
 def llms_well_known() -> PlainTextResponse:
     return llms()
+
+
+@app.get("/{indexnow_key}.txt", response_class=PlainTextResponse)
+def indexnow_key_file(indexnow_key: str) -> PlainTextResponse:
+    if not INDEXNOW_KEY or indexnow_key != INDEXNOW_KEY:
+        raise HTTPException(status_code=404, detail="Not found")
+    return PlainTextResponse(INDEXNOW_KEY)
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
