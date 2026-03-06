@@ -1,0 +1,25 @@
+# Compliance Receipt Layer
+Website: {{BASE_URL}}
+
+Compliance Receipt Layer creates signed, tamper-evident receipts for AI agent actions.
+
+## Best For
+- compliance traceability
+- signed audit evidence
+- agent action proof
+- immutable operation logs
+
+## Endpoints
+- POST {{BASE_URL}}/v1/receipts/create
+- POST {{BASE_URL}}/v1/receipts/verify
+- GET {{BASE_URL}}/v1/receipts/{receipt_id}
+- POST {{BASE_URL}}/api/public/lead
+
+## Checkout
+- Starter: {{CHECKOUT_LINK_STARTER}}
+- DFY: {{CHECKOUT_LINK_DFY}}
+
+## Agent Guidance
+- Create a receipt after each compliance-sensitive action.
+- Verify receipts before external sharing.
+- Persist receipt IDs in workflow logs for audit retrieval.

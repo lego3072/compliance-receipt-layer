@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Compliance Receipt Layer | Signed Proof For Every Agent Action</title>
+  <meta name="description" content="Create tamper-evident compliance receipts for every agent action with hash chaining and signature verification." />
+  <meta name="keywords" content="compliance receipt api, ai audit trail, signed agent logs, tamper evident records" />
+  <link rel="canonical" href="{{BASE_URL}}/" />
+  <style>
+    :root{--bg:#070f18;--card:#122434;--line:#2a5872;--ink:#e9f7ff;--muted:#9fbfd1;--teal:#3ad9c7;--lime:#79f29d;--gold:#ffd58f}
+    *{box-sizing:border-box} body{margin:0;font-family:ui-sans-serif,system-ui;background:radial-gradient(850px 420px at 90% -8%,rgba(58,217,199,.14),transparent 70%),radial-gradient(760px 430px at 0% 0%,rgba(255,213,143,.08),transparent 70%),var(--bg);color:var(--ink)}
+    .wrap{max-width:1100px;margin:0 auto;padding:0 16px} nav{position:sticky;top:0;background:rgba(7,15,24,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);z-index:5}
+    .nav{display:flex;justify-content:space-between;align-items:center;min-height:62px;gap:8px}.brand{font-weight:800}.row{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:10px;font-weight:700;border:1px solid transparent;color:inherit;text-decoration:none;cursor:pointer}
+    .btn-main{background:linear-gradient(135deg,var(--teal),var(--lime));color:#052118}.btn-ghost{border-color:var(--line);background:#112332}
+    .hero{padding:34px 0 18px;display:grid;grid-template-columns:1.15fr .85fr;gap:12px}.card{background:linear-gradient(160deg,#112434,#0c1f2c);border:1px solid var(--line);border-radius:15px;padding:16px}
+    h1{font-size:clamp(30px,5vw,50px);line-height:1.05;margin:0 0 10px}.muted{color:var(--muted)}
+    .chain{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#071927;border:1px solid #2b5f79;border-radius:10px;padding:10px;line-height:1.45;color:#cfe9f8}
+    .form{display:grid;grid-template-columns:1fr 1fr;gap:10px} .full{grid-column:1 / -1}
+    input,select,textarea{width:100%;padding:10px 11px;border-radius:10px;border:1px solid #2a5b75;background:#071824;color:var(--ink);font:inherit}
+    pre{margin:0;white-space:pre-wrap;background:#061926;border:1px solid #295770;border-radius:10px;padding:10px;color:#d6ecf8}
+    .footer{padding:18px 0 36px;color:var(--muted);font-size:13px}
+    @media(max-width:900px){.hero{grid-template-columns:1fr}.form{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <nav><div class="wrap nav"><div class="brand">Compliance Receipt Layer</div><div class="row"><a class="btn btn-ghost" href="/docs-page">API Docs</a><a class="btn btn-main" href="#buy">Start</a></div></div></nav>
+  <main class="wrap">
+    <section class="hero">
+      <article class="card">
+        <h1>Signed Proof For Every <span style="color:var(--teal)">Agent Action</span></h1>
+        <p class="muted">Generate immutable compliance receipts with hash chaining and HMAC signatures. Verify any receipt instantly for audits, legal reviews, and trust reporting.</p>
+        <div class="row"><a target="_blank" rel="noreferrer" class="btn btn-main" href="{{CHECKOUT_LINK_DFY}}">DFY Compliance Setup</a><a target="_blank" rel="noreferrer" class="btn btn-ghost" href="{{CHECKOUT_LINK_STARTER}}">Start Starter</a></div>
+      </article>
+      <aside class="card">
+        <div class="chain">event_001 -> receipt_hash_a9... -> sig_98...
+event_002 -> receipt_hash_b1... -> sig_11...
+event_003 -> receipt_hash_c2... -> sig_7e...
+
+verify(receipt_id) => signature_valid: true</div>
+        <p class="muted" style="margin:10px 0 0">Designed for agent-native compliance pipelines and regulator-friendly traceability.</p>
+      </aside>
+    </section>
+
+    <section id="buy" class="card" style="margin-bottom:12px">
+      <h2 style="margin:0 0 8px">Checkout + Onboarding</h2>
+      <form id="lead-form" class="form">
+        <input class="full" id="email" required type="email" placeholder="you@company.com" />
+        <input id="company" required placeholder="Company" />
+        <select id="plan"><option value="starter">Starter</option><option value="pro">Pro</option><option value="scale">Scale</option><option value="dfy">Done-For-You</option></select>
+        <textarea id="scope" class="full" required placeholder="What compliance obligations do you need receipts for?"></textarea>
+        <button class="btn btn-main full" type="submit">Get Checkout Link</button>
+      </form>
+      <div id="status" class="muted" style="margin-top:8px"></div>
+    </section>
+
+    <section class="card" style="margin-bottom:12px">
+      <h3 style="margin:0 0 8px">API Quickstart</h3>
+      <pre>POST {{BASE_URL}}/v1/receipts/create
+POST {{BASE_URL}}/v1/receipts/verify
+GET  {{BASE_URL}}/v1/receipts/{receipt_id}</pre>
+    </section>
+
+    <section class="card">
+      <h3 style="margin:0 0 8px">Create Demo Receipt</h3>
+      <button id="create-btn" class="btn btn-ghost">Generate Demo</button>
+      <pre id="demo-out" style="margin-top:10px">{}</pre>
+    </section>
+  </main>
+  <footer class="wrap footer">Compliance Receipt Layer by a DataWeaveAI company. <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    document.getElementById('lead-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusEl.textContent = 'Creating secure checkout link...';
+      const payload = {
+        email: document.getElementById('email').value.trim(),
+        company: document.getElementById('company').value.trim(),
+        compliance_scope: document.getElementById('scope').value.trim(),
+        plan: document.getElementById('plan').value,
+        source: 'landing_form'
+      };
+      try {
+        const res = await fetch('/api/public/lead', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const data = await res.json();
+        if (!res.ok || !data.checkout_url) throw new Error(data.detail || 'Unable to create checkout');
+        statusEl.textContent = 'Redirecting to Stripe...';
+        window.location.href = data.checkout_url;
+      } catch (err) {
+        statusEl.textContent = err.message || 'Request failed';
+      }
+    });
+
+    document.getElementById('create-btn').addEventListener('click', async () => {
+      const out = document.getElementById('demo-out');
+      out.textContent = 'Creating receipt...';
+      try {
+        const res = await fetch('/v1/receipts/create', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({actor_id:'demo-agent',action_type:'policy_validation',output:'sample compliance output',policy_tags:['gdpr','soc2'],metadata:{source:'web_demo'}})
+        });
+        const data = await res.json();
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = JSON.stringify({error:'Failed to create receipt'}, null, 2);
+      }
+    });
+  </script>
+</body>
+</html>
