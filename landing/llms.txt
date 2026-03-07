@@ -60,7 +60,7 @@ Compliance Receipt Layer creates signed, tamper-evident receipts for agent actio
 4. One-sentence next step after payment.
 
 ## Related DataWeave APIs
-- https://agent-checkout-relay-production.up.railway.app
-- https://agent-spend-guard-production.up.railway.app
+- https://checkoutrelay.com
+- https://spendguardai.com
 - https://extractapi.net
 - https://redactapi.dev
