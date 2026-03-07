@@ -47,7 +47,7 @@ AGENT_ROUTER_URL = os.getenv("AGENT_ROUTER_URL", "https://get-agent-router.com")
 
 CHECKOUT_LINK_STARTER = os.getenv("CHECKOUT_LINK_STARTER", "https://buy.stripe.com/dRm4gz51vg162Gj5b33Je06").strip()
 CHECKOUT_LINK_DFY = os.getenv("CHECKOUT_LINK_DFY", "https://buy.stripe.com/cNidR9bpT0284Or8nf3Je04").strip()
-STARTER_PRICE_LABEL = os.getenv("STARTER_PRICE_LABEL", "$29/mo").strip()
+STARTER_PRICE_LABEL = os.getenv("STARTER_PRICE_LABEL", "$199/mo").strip()
 DFY_PRICE_LABEL = os.getenv("DFY_PRICE_LABEL", "$2.5k one-time").strip()
 
 API_RATE_WINDOW_SECONDS = int(os.getenv("API_RATE_WINDOW_SECONDS", "60"))
