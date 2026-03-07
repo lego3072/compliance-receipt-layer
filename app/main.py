@@ -62,6 +62,7 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "").strip()
 TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY", "1x00000000000000000000AA").strip()
+TURNSTILE_REQUIRED = os.getenv("TURNSTILE_REQUIRED", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 if stripe and STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
@@ -259,8 +260,12 @@ def checkout_link_for_plan(plan: str) -> str:
 
 
 def verify_turnstile_token(token: Optional[str], ip: str) -> bool:
-    if not TURNSTILE_SECRET_KEY:
+    if not TURNSTILE_REQUIRED:
         return True
+    if not TURNSTILE_SECRET_KEY:
+        return False
+    if TURNSTILE_SITE_KEY == "1x00000000000000000000AA":
+        return False
     if not token:
         return False
     payload = urllib.parse.urlencode(
@@ -562,8 +567,17 @@ def startup() -> None:
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "service": APP_SLUG, "time": now_iso()}
+def health() -> dict[str, Any]:
+    turnstile_ready = bool(TURNSTILE_SECRET_KEY) and TURNSTILE_SITE_KEY != "1x00000000000000000000AA"
+    instant_activation_ready = bool(RESEND_API_KEY and STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET)
+    return {
+        "status": "ok",
+        "service": APP_SLUG,
+        "time": now_iso(),
+        "turnstile_required": TURNSTILE_REQUIRED,
+        "turnstile_ready": turnstile_ready,
+        "instant_activation_ready": instant_activation_ready,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
