@@ -434,14 +434,6 @@ def llms() -> PlainTextResponse:
 def llms_well_known() -> PlainTextResponse:
     return llms()
 
-
-@app.get("/{indexnow_key}.txt", response_class=PlainTextResponse)
-def indexnow_key_file(indexnow_key: str) -> PlainTextResponse:
-    if not INDEXNOW_KEY or indexnow_key != INDEXNOW_KEY:
-        raise HTTPException(status_code=404, detail="Not found")
-    return PlainTextResponse(INDEXNOW_KEY)
-
-
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots() -> PlainTextResponse:
     return PlainTextResponse(
@@ -489,6 +481,13 @@ def sitemap() -> PlainTextResponse:
 </urlset>""",
         media_type="application/xml",
     )
+
+
+@app.get("/{indexnow_key}.txt", response_class=PlainTextResponse)
+def indexnow_key_file(indexnow_key: str) -> PlainTextResponse:
+    if not INDEXNOW_KEY or indexnow_key != INDEXNOW_KEY:
+        raise HTTPException(status_code=404, detail="Not found")
+    return PlainTextResponse(INDEXNOW_KEY)
 
 
 @app.get("/.well-known/agent-offer.json", response_class=JSONResponse)
