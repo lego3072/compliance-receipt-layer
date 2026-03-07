@@ -52,6 +52,10 @@ DFY_PRICE_LABEL = os.getenv("DFY_PRICE_LABEL", "$2.5k one-time").strip()
 
 API_RATE_WINDOW_SECONDS = int(os.getenv("API_RATE_WINDOW_SECONDS", "60"))
 LEAD_RATE_LIMIT_PER_MINUTE = int(os.getenv("LEAD_RATE_LIMIT_PER_MINUTE", "15"))
+ENFORCE_STRICT_PAID_API = os.getenv("ENFORCE_STRICT_PAID_API", "true").strip().lower() in {"1", "true", "yes", "on"}
+ALLOW_PUBLIC_ACCESS_KEY_ISSUE = os.getenv("ALLOW_PUBLIC_ACCESS_KEY_ISSUE", "false").strip().lower() in {"1", "true", "yes", "on"}
+STARTER_MONTHLY_API_CALL_LIMIT = int(os.getenv("STARTER_MONTHLY_API_CALL_LIMIT", "2500"))
+DFY_MONTHLY_API_CALL_LIMIT = int(os.getenv("DFY_MONTHLY_API_CALL_LIMIT", "15000"))
 RECEIPT_RATE_LIMIT_PER_MINUTE = int(os.getenv("RECEIPT_RATE_LIMIT_PER_MINUTE", "120"))
 ABANDONED_REMINDERS_ENABLED = os.getenv("ABANDONED_REMINDERS_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 ABANDONED_REMINDER_10M_SECONDS = int(os.getenv("ABANDONED_REMINDER_10M_SECONDS", "600"))
@@ -230,6 +234,18 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS api_monthly_usage (
+                email TEXT NOT NULL,
+                period_key TEXT NOT NULL,
+                plan TEXT NOT NULL,
+                used_calls INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (email, period_key)
+            )
+            """
+        )
 
 
 def client_ip(request: Request) -> str:
@@ -253,6 +269,60 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> None:
         bucket.append(time.time())
         _rate_state[key] = bucket
 
+
+def current_usage_period_key() -> str:
+    now = datetime.now(timezone.utc)
+    return f"{now.year:04d}-{now.month:02d}"
+
+
+def monthly_api_limit_for_plan(plan: str) -> int:
+    normalized = (plan or "").strip().lower()
+    if normalized == "starter":
+        return max(0, STARTER_MONTHLY_API_CALL_LIMIT)
+    if normalized == "dfy":
+        return max(0, DFY_MONTHLY_API_CALL_LIMIT)
+    return 0
+
+
+def enforce_plan_usage_quota(account_row: sqlite3.Row, units: int = 1) -> None:
+    if not ENFORCE_STRICT_PAID_API:
+        return
+
+    email = (account_row["email"] or "").strip().lower()
+    plan = (account_row["plan"] or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=401, detail="Account email missing")
+
+    monthly_limit = monthly_api_limit_for_plan(plan)
+    if monthly_limit <= 0:
+        raise HTTPException(status_code=402, detail="Paid plan required")
+
+    period_key = current_usage_period_key()
+    units = max(1, int(units or 1))
+
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT used_calls FROM api_monthly_usage WHERE email = ? AND period_key = ?",
+            (email, period_key),
+        ).fetchone()
+        used = int(row["used_calls"]) if row else 0
+        if used + units > monthly_limit:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Monthly API limit reached ({monthly_limit} calls on {plan} plan).",
+            )
+        conn.execute(
+            """
+            INSERT INTO api_monthly_usage (email, period_key, plan, used_calls, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(email, period_key)
+            DO UPDATE SET
+                plan = excluded.plan,
+                used_calls = api_monthly_usage.used_calls + excluded.used_calls,
+                updated_at = excluded.updated_at
+            """,
+            (email, period_key, plan, units, now_iso()),
+        )
 
 def checkout_link_for_plan(plan: str) -> str:
     return {
@@ -542,16 +612,25 @@ def require_paid_access(request: Request) -> sqlite3.Row:
     api_key = request.headers.get("x-api-key", "").strip()
     if not api_key:
         raise HTTPException(status_code=401, detail="Missing x-api-key")
+
     key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
     with get_conn() as conn:
         row = conn.execute(
             "SELECT email, status, plan FROM billing_accounts WHERE api_key_hash = ?",
             (key_hash,),
         ).fetchone()
+
     if not row:
         raise HTTPException(status_code=401, detail="Invalid API key")
     if row["status"] not in ACTIVE_ACCOUNT_STATUSES:
         raise HTTPException(status_code=402, detail="Account is not active")
+
+    if ENFORCE_STRICT_PAID_API:
+        plan = (row["plan"] or "").strip().lower()
+        if plan not in {"starter", "dfy"}:
+            raise HTTPException(status_code=402, detail="Paid plan required")
+
+    enforce_plan_usage_quota(row, units=1)
     return row
 
 
@@ -821,6 +900,8 @@ def capture_public_event(payload: PublicEventRequest, request: Request) -> dict[
 
 @app.post("/api/public/access-key")
 def request_access_key(payload: AccessKeyRequest, request: Request) -> dict[str, Any]:
+    if ENFORCE_STRICT_PAID_API and not ALLOW_PUBLIC_ACCESS_KEY_ISSUE:
+        raise HTTPException(status_code=403, detail="Public access-key recovery is disabled")
     ip = client_ip(request)
     check_rate_limit(f"access-key:{ip}", 8, API_RATE_WINDOW_SECONDS)
     email = normalize_email(payload.email)
