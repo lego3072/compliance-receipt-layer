@@ -51,6 +51,10 @@ CHECKOUT_LINK_DFY = os.getenv("CHECKOUT_LINK_DFY", "https://buy.stripe.com/cNidR
 API_RATE_WINDOW_SECONDS = int(os.getenv("API_RATE_WINDOW_SECONDS", "60"))
 LEAD_RATE_LIMIT_PER_MINUTE = int(os.getenv("LEAD_RATE_LIMIT_PER_MINUTE", "15"))
 RECEIPT_RATE_LIMIT_PER_MINUTE = int(os.getenv("RECEIPT_RATE_LIMIT_PER_MINUTE", "120"))
+ABANDONED_REMINDERS_ENABLED = os.getenv("ABANDONED_REMINDERS_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+ABANDONED_REMINDER_10M_SECONDS = int(os.getenv("ABANDONED_REMINDER_10M_SECONDS", "600"))
+ABANDONED_REMINDER_6H_SECONDS = int(os.getenv("ABANDONED_REMINDER_6H_SECONDS", "21600"))
+ABANDONED_REMINDER_24H_SECONDS = int(os.getenv("ABANDONED_REMINDER_24H_SECONDS", "86400"))
 
 CORS_ALLOW_ORIGINS = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "*").split(",") if o.strip()]
 INDEXNOW_KEY = os.getenv("INDEXNOW_KEY", "").strip()
@@ -212,6 +216,17 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS billing_notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                notification_key TEXT NOT NULL,
+                notification_type TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(notification_key, notification_type)
+            )
+            """
+        )
 
 
 def client_ip(request: Request) -> str:
@@ -340,6 +355,84 @@ def to_iso_from_unix(ts: Any) -> Optional[str]:
 def get_account_by_email(email: str) -> Optional[sqlite3.Row]:
     with get_conn() as conn:
         return conn.execute("SELECT * FROM billing_accounts WHERE email = ?", (normalize_email(email),)).fetchone()
+
+
+def mark_notification_sent(notification_key: str, notification_type: str) -> bool:
+    if not notification_key:
+        return False
+    with get_conn() as conn:
+        try:
+            conn.execute(
+                """
+                INSERT INTO billing_notifications (notification_key, notification_type, created_at)
+                VALUES (?, ?, ?)
+                """,
+                (notification_key[:140], notification_type[:80], now_iso()),
+            )
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+
+def has_active_billing_account(email: str) -> bool:
+    row = get_account_by_email(email)
+    if not row:
+        return False
+    status = (row["status"] or "").strip().lower()
+    return status in ACTIVE_ACCOUNT_STATUSES
+
+
+def abandoned_reminder_steps() -> list[tuple[int, str]]:
+    return [
+        (max(5, ABANDONED_REMINDER_10M_SECONDS), "10-minute"),
+        (max(5, ABANDONED_REMINDER_6H_SECONDS), "6-hour"),
+        (max(5, ABANDONED_REMINDER_24H_SECONDS), "24-hour"),
+    ]
+
+
+def send_abandoned_checkout_reminder(*, reminder_key: str, email: str, plan: str, checkout_url: str, label: str) -> None:
+    normalized_email = normalize_email(email)
+    if not EMAIL_RE.match(normalized_email):
+        return
+    if has_active_billing_account(normalized_email):
+        return
+    notification_type = f"abandoned_{label.replace('-', '_')}"
+    if not mark_notification_sent(reminder_key, notification_type):
+        return
+    send_resend_email(
+        subject=f"{APP_NAME}: complete your {plan} checkout",
+        html=(
+            f"<p>You started {APP_NAME} {label} ago but did not finish checkout.</p>"
+            f"<p><a href=\"{checkout_url}\">Resume secure checkout</a></p>"
+            f"<p>If you already completed payment, ignore this message.</p>"
+        ),
+        to_addresses=[normalized_email],
+    )
+
+
+def schedule_abandoned_checkout_sequence(*, reminder_key: str, email: str, plan: str, checkout_url: str) -> None:
+    if not ABANDONED_REMINDERS_ENABLED or not RESEND_API_KEY:
+        return
+    normalized_email = normalize_email(email)
+    if not EMAIL_RE.match(normalized_email):
+        return
+    reminder_key = reminder_key.strip()
+    if not reminder_key:
+        return
+    for delay_seconds, label in abandoned_reminder_steps():
+        timer = threading.Timer(
+            delay_seconds,
+            send_abandoned_checkout_reminder,
+            kwargs={
+                "reminder_key": reminder_key,
+                "email": normalized_email,
+                "plan": plan,
+                "checkout_url": checkout_url,
+                "label": label,
+            },
+        )
+        timer.daemon = True
+        timer.start()
 
 
 def get_account_by_customer(customer_id: str) -> Optional[sqlite3.Row]:
@@ -651,6 +744,12 @@ def create_lead(payload: LeadRequest, request: Request) -> dict[str, Any]:
             f"<p>Email: {email}<br>Company: {payload.company}<br>Plan: {payload.plan}<br>"
             f"Checkout: <a href='{checkout_url}'>{checkout_url}</a></p>"
         ),
+    )
+    schedule_abandoned_checkout_sequence(
+        reminder_key=lead_id,
+        email=email,
+        plan=payload.plan,
+        checkout_url=checkout_url,
     )
 
     return {"ok": True, "lead_id": lead_id, "checkout_url": checkout_url, "plan": payload.plan}
