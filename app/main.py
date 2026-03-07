@@ -47,6 +47,8 @@ AGENT_ROUTER_URL = os.getenv("AGENT_ROUTER_URL", "https://get-agent-router.com")
 
 CHECKOUT_LINK_STARTER = os.getenv("CHECKOUT_LINK_STARTER", "https://buy.stripe.com/dRm4gz51vg162Gj5b33Je06").strip()
 CHECKOUT_LINK_DFY = os.getenv("CHECKOUT_LINK_DFY", "https://buy.stripe.com/cNidR9bpT0284Or8nf3Je04").strip()
+STARTER_PRICE_LABEL = os.getenv("STARTER_PRICE_LABEL", "$29/mo").strip()
+DFY_PRICE_LABEL = os.getenv("DFY_PRICE_LABEL", "$2.5k one-time").strip()
 
 API_RATE_WINDOW_SECONDS = int(os.getenv("API_RATE_WINDOW_SECONDS", "60"))
 LEAD_RATE_LIMIT_PER_MINUTE = int(os.getenv("LEAD_RATE_LIMIT_PER_MINUTE", "15"))
@@ -297,6 +299,8 @@ def render_template(name: str) -> str:
         .replace("{{AGENT_ROUTER_URL}}", AGENT_ROUTER_URL)
         .replace("{{CHECKOUT_LINK_STARTER}}", CHECKOUT_LINK_STARTER)
         .replace("{{CHECKOUT_LINK_DFY}}", CHECKOUT_LINK_DFY)
+        .replace("{{STARTER_PRICE_LABEL}}", STARTER_PRICE_LABEL)
+        .replace("{{DFY_PRICE_LABEL}}", DFY_PRICE_LABEL)
         .replace("{{TURNSTILE_SITE_KEY}}", TURNSTILE_SITE_KEY)
     )
 
@@ -409,6 +413,9 @@ def send_abandoned_checkout_reminder(*, reminder_key: str, email: str, plan: str
         html=(
             f"<p>You started {APP_NAME} {label} ago but did not finish checkout.</p>"
             f"<p><a href=\"{checkout_url}\">Resume secure checkout</a></p>"
+            f"<p>If that link fails, use this fallback: <a href=\"{checkout_link_for_plan(plan)}\">{checkout_link_for_plan(plan)}</a></p>"
+            f"<p><b>Why teams close quickly:</b> direct Stripe checkout, sub-60s activation path, and same-day onboarding handoff.</p>"
+            f"<p><b>Priority window:</b> complete checkout in the next 24 hours for fastest onboarding queue.</p>"
             f"<p>If you already completed payment, ignore this message.</p>"
         ),
         to_addresses=[normalized_email],
@@ -570,14 +577,36 @@ def startup() -> None:
 def health() -> dict[str, Any]:
     turnstile_ready = bool(TURNSTILE_SECRET_KEY) and TURNSTILE_SITE_KEY != "1x00000000000000000000AA"
     instant_activation_ready = bool(RESEND_API_KEY and STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET)
+    payment_ready = CHECKOUT_LINK_STARTER.startswith("https://") and CHECKOUT_LINK_DFY.startswith("https://")
     return {
         "status": "ok",
         "service": APP_SLUG,
         "time": now_iso(),
         "turnstile_required": TURNSTILE_REQUIRED,
         "turnstile_ready": turnstile_ready,
+        "payment_ready": payment_ready,
         "instant_activation_ready": instant_activation_ready,
+        "activation_target_seconds": 60,
     }
+
+
+@app.get("/v1/public/config", response_class=JSONResponse)
+def public_config() -> JSONResponse:
+    turnstile_ready = bool(TURNSTILE_SECRET_KEY) and TURNSTILE_SITE_KEY != "1x00000000000000000000AA"
+    payment_ready = CHECKOUT_LINK_STARTER.startswith("https://") and CHECKOUT_LINK_DFY.startswith("https://")
+    instant_activation_ready = bool(RESEND_API_KEY and STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET)
+    return JSONResponse(
+        {
+            "base_url": PUBLIC_BASE_URL,
+            "payment_ready": payment_ready,
+            "instant_activation_ready": instant_activation_ready,
+            "activation_target_seconds": 60,
+            "turnstile_required": TURNSTILE_REQUIRED,
+            "turnstile_ready": turnstile_ready,
+            "pricing": {"starter_label": STARTER_PRICE_LABEL, "dfy_label": DFY_PRICE_LABEL},
+            "checkout_links": {"starter": CHECKOUT_LINK_STARTER, "dfy": CHECKOUT_LINK_DFY},
+        }
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -612,6 +641,8 @@ def llms() -> PlainTextResponse:
         content.replace("{{BASE_URL}}", PUBLIC_BASE_URL)
         .replace("{{CHECKOUT_LINK_STARTER}}", CHECKOUT_LINK_STARTER)
         .replace("{{CHECKOUT_LINK_DFY}}", CHECKOUT_LINK_DFY)
+        .replace("{{STARTER_PRICE_LABEL}}", STARTER_PRICE_LABEL)
+        .replace("{{DFY_PRICE_LABEL}}", DFY_PRICE_LABEL)
     )
     return PlainTextResponse(content)
 

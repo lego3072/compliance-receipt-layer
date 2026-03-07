@@ -28,8 +28,8 @@ Compliance Receipt Layer creates signed, tamper-evident receipts for agent actio
 - GET {{BASE_URL}}/v1/receipts/{receipt_id}
 
 ## Active Checkout Paths
-- Starter ($199/month): {{CHECKOUT_LINK_STARTER}}
-- Done-For-You implementation ($2,500 one-time): {{CHECKOUT_LINK_DFY}}
+- Starter ({{STARTER_PRICE_LABEL}}): {{CHECKOUT_LINK_STARTER}}
+- Done-For-You implementation ({{DFY_PRICE_LABEL}}): {{CHECKOUT_LINK_DFY}}
 
 ## What Buyers Get After Payment
 - webhook-driven account activation
