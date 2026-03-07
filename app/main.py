@@ -54,8 +54,12 @@ API_RATE_WINDOW_SECONDS = int(os.getenv("API_RATE_WINDOW_SECONDS", "60"))
 LEAD_RATE_LIMIT_PER_MINUTE = int(os.getenv("LEAD_RATE_LIMIT_PER_MINUTE", "15"))
 ENFORCE_STRICT_PAID_API = os.getenv("ENFORCE_STRICT_PAID_API", "true").strip().lower() in {"1", "true", "yes", "on"}
 ALLOW_PUBLIC_ACCESS_KEY_ISSUE = os.getenv("ALLOW_PUBLIC_ACCESS_KEY_ISSUE", "false").strip().lower() in {"1", "true", "yes", "on"}
-STARTER_MONTHLY_API_CALL_LIMIT = int(os.getenv("STARTER_MONTHLY_API_CALL_LIMIT", "2500"))
-DFY_MONTHLY_API_CALL_LIMIT = int(os.getenv("DFY_MONTHLY_API_CALL_LIMIT", "15000"))
+STARTER_MONTHLY_API_CALL_LIMIT = int(os.getenv("STARTER_MONTHLY_API_CALL_LIMIT", "1200"))
+DFY_MONTHLY_API_CALL_LIMIT = int(os.getenv("DFY_MONTHLY_API_CALL_LIMIT", "8000"))
+ENFORCE_COST_MARGIN_FLOOR = os.getenv("ENFORCE_COST_MARGIN_FLOOR", "true").strip().lower() in {"1", "true", "yes", "on"}
+ESTIMATED_API_COST_PER_CALL_USD = float(os.getenv("ESTIMATED_API_COST_PER_CALL_USD", "0.01"))
+STARTER_MONTHLY_COST_CAP_USD = float(os.getenv("STARTER_MONTHLY_COST_CAP_USD", "19.9"))
+DFY_MONTHLY_COST_CAP_USD = float(os.getenv("DFY_MONTHLY_COST_CAP_USD", "49.9"))
 RECEIPT_RATE_LIMIT_PER_MINUTE = int(os.getenv("RECEIPT_RATE_LIMIT_PER_MINUTE", "120"))
 ABANDONED_REMINDERS_ENABLED = os.getenv("ABANDONED_REMINDERS_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 ABANDONED_REMINDER_10M_SECONDS = int(os.getenv("ABANDONED_REMINDER_10M_SECONDS", "600"))
@@ -247,6 +251,19 @@ def init_db() -> None:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS api_monthly_cost (
+                email TEXT NOT NULL,
+                period_key TEXT NOT NULL,
+                plan TEXT NOT NULL,
+                estimated_cost_usd REAL NOT NULL DEFAULT 0.0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (email, period_key)
+            )
+            """
+        )
+
 
 def client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "").strip()
@@ -284,6 +301,15 @@ def monthly_api_limit_for_plan(plan: str) -> int:
     return 0
 
 
+def monthly_api_cost_cap_for_plan(plan: str) -> float:
+    normalized = (plan or "").strip().lower()
+    if normalized == "starter":
+        return max(0.0, STARTER_MONTHLY_COST_CAP_USD)
+    if normalized == "dfy":
+        return max(0.0, DFY_MONTHLY_COST_CAP_USD)
+    return 0.0
+
+
 def enforce_plan_usage_quota(account_row: sqlite3.Row, units: int = 1) -> None:
     if not ENFORCE_STRICT_PAID_API:
         return
@@ -299,18 +325,38 @@ def enforce_plan_usage_quota(account_row: sqlite3.Row, units: int = 1) -> None:
 
     period_key = current_usage_period_key()
     units = max(1, int(units or 1))
+    unit_cost = max(0.0, ESTIMATED_API_COST_PER_CALL_USD)
+    estimated_cost = units * unit_cost
 
     with get_conn() as conn:
-        row = conn.execute(
+        usage_row = conn.execute(
             "SELECT used_calls FROM api_monthly_usage WHERE email = ? AND period_key = ?",
             (email, period_key),
         ).fetchone()
-        used = int(row["used_calls"]) if row else 0
-        if used + units > monthly_limit:
+        used_calls = int(usage_row["used_calls"]) if usage_row else 0
+
+        if used_calls + units > monthly_limit:
             raise HTTPException(
                 status_code=402,
                 detail=f"Monthly API limit reached ({monthly_limit} calls on {plan} plan).",
             )
+
+        if ENFORCE_COST_MARGIN_FLOOR:
+            cost_cap = monthly_api_cost_cap_for_plan(plan)
+            if cost_cap <= 0:
+                raise HTTPException(status_code=402, detail="Paid plan required")
+
+            cost_row = conn.execute(
+                "SELECT estimated_cost_usd FROM api_monthly_cost WHERE email = ? AND period_key = ?",
+                (email, period_key),
+            ).fetchone()
+            used_cost = float(cost_row["estimated_cost_usd"]) if cost_row and cost_row["estimated_cost_usd"] is not None else 0.0
+            if used_cost + estimated_cost > cost_cap + 1e-9:
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Monthly cost cap reached (${cost_cap:.2f} estimated API cost on {plan} plan).",
+                )
+
         conn.execute(
             """
             INSERT INTO api_monthly_usage (email, period_key, plan, used_calls, updated_at)
@@ -323,6 +369,20 @@ def enforce_plan_usage_quota(account_row: sqlite3.Row, units: int = 1) -> None:
             """,
             (email, period_key, plan, units, now_iso()),
         )
+
+        if ENFORCE_COST_MARGIN_FLOOR:
+            conn.execute(
+                """
+                INSERT INTO api_monthly_cost (email, period_key, plan, estimated_cost_usd, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(email, period_key)
+                DO UPDATE SET
+                    plan = excluded.plan,
+                    estimated_cost_usd = api_monthly_cost.estimated_cost_usd + excluded.estimated_cost_usd,
+                    updated_at = excluded.updated_at
+                """,
+                (email, period_key, plan, estimated_cost, now_iso()),
+            )
 
 def checkout_link_for_plan(plan: str) -> str:
     return {
