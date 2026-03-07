@@ -8,6 +8,7 @@ import sqlite3
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,6 +56,8 @@ CORS_ALLOW_ORIGINS = [o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "*").sp
 INDEXNOW_KEY = os.getenv("INDEXNOW_KEY", "").strip()
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "").strip()
+TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY", "1x00000000000000000000AA").strip()
 
 if stripe and STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
@@ -81,6 +84,13 @@ class LeadRequest(BaseModel):
     company: str = Field(min_length=2, max_length=120)
     compliance_scope: str = Field(min_length=4, max_length=300)
     plan: str = Field(default="starter", pattern="^(starter|dfy)$")
+    source: Optional[str] = Field(default="site", max_length=80)
+    turnstile_token: Optional[str] = Field(default=None, max_length=2048)
+
+
+class PublicEventRequest(BaseModel):
+    event: str = Field(pattern="^(landing_view|checkout_started|checkout_completed|activation_completed)$")
+    plan: Optional[str] = Field(default=None, pattern="^(starter|dfy)$")
     source: Optional[str] = Field(default="site", max_length=80)
 
 
@@ -160,6 +170,21 @@ def init_db() -> None:
         )
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS funnel_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                event TEXT NOT NULL,
+                plan TEXT,
+                source TEXT,
+                email TEXT,
+                ip_hash TEXT
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_funnel_events_event ON funnel_events(event)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_funnel_events_created ON funnel_events(created_at)")
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS billing_accounts (
                 email TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
@@ -218,6 +243,32 @@ def checkout_link_for_plan(plan: str) -> str:
     }.get(plan, CHECKOUT_LINK_STARTER)
 
 
+def verify_turnstile_token(token: Optional[str], ip: str) -> bool:
+    if not TURNSTILE_SECRET_KEY:
+        return True
+    if not token:
+        return False
+    payload = urllib.parse.urlencode(
+        {
+            "secret": TURNSTILE_SECRET_KEY,
+            "response": token,
+            "remoteip": ip,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        data=payload,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+        return bool(body.get("success"))
+    except Exception:
+        return False
+
+
 def render_template(name: str) -> str:
     raw = (LANDING_DIR / name).read_text(encoding="utf-8")
     return (
@@ -226,6 +277,7 @@ def render_template(name: str) -> str:
         .replace("{{AGENT_ROUTER_URL}}", AGENT_ROUTER_URL)
         .replace("{{CHECKOUT_LINK_STARTER}}", CHECKOUT_LINK_STARTER)
         .replace("{{CHECKOUT_LINK_DFY}}", CHECKOUT_LINK_DFY)
+        .replace("{{TURNSTILE_SITE_KEY}}", TURNSTILE_SITE_KEY)
     )
 
 
@@ -556,6 +608,8 @@ def ai_plugin() -> JSONResponse:
 def create_lead(payload: LeadRequest, request: Request) -> dict[str, Any]:
     ip = client_ip(request)
     check_rate_limit(f"lead:{ip}", LEAD_RATE_LIMIT_PER_MINUTE, API_RATE_WINDOW_SECONDS)
+    if not verify_turnstile_token(payload.turnstile_token, ip):
+        raise HTTPException(status_code=400, detail="Verification failed. Please retry.")
     email = normalize_email(payload.email)
     blocked_reason = blocked_checkout_email_reason(email)
     if blocked_reason:
@@ -582,6 +636,13 @@ def create_lead(payload: LeadRequest, request: Request) -> dict[str, Any]:
                 checkout_url,
             ),
         )
+        conn.execute(
+            """
+            INSERT INTO funnel_events (created_at, event, plan, source, email, ip_hash)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (now_iso(), "checkout_started", payload.plan, (payload.source or "site").strip(), email, ip_hash(ip)),
+        )
 
     send_resend_email(
         subject=f"ReceiptLayer lead: {payload.plan}",
@@ -593,6 +654,25 @@ def create_lead(payload: LeadRequest, request: Request) -> dict[str, Any]:
     )
 
     return {"ok": True, "lead_id": lead_id, "checkout_url": checkout_url, "plan": payload.plan}
+
+
+@app.post("/api/public/event")
+def capture_public_event(payload: PublicEventRequest, request: Request) -> dict[str, Any]:
+    ip = client_ip(request)
+    check_rate_limit(f"event:{ip}", 40, API_RATE_WINDOW_SECONDS)
+    email_raw = request.headers.get("x-user-email", "")
+    email = normalize_email(email_raw) if email_raw else None
+    if email and not EMAIL_RE.match(email):
+        email = None
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO funnel_events (created_at, event, plan, source, email, ip_hash)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (now_iso(), payload.event, payload.plan, payload.source or "site", email, ip_hash(ip)),
+        )
+    return {"ok": True}
 
 
 @app.post("/api/public/access-key")

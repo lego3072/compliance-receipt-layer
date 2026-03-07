@@ -20,6 +20,7 @@
   <meta name="twitter:image" content="{{BASE_URL}}/logo.svg" />
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Compliance Receipt Layer","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"{{BASE_URL}}/","description":"Signed receipt and verification layer for AI workflows.","provider":{"@type":"Organization","name":"DataWeave INC"}}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How can we prove an AI workflow step happened?","acceptedAnswer":{"@type":"Answer","text":"Create a signed receipt at each critical step and verify it by receipt ID anytime."}},{"@type":"Question","name":"Can this support SOC2 and GDPR audit evidence?","acceptedAnswer":{"@type":"Answer","text":"Yes, it is designed to provide machine-verifiable action evidence for compliance workflows."}}]}</script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Source+Serif+4:wght@600;700&display=swap');
     :root{--bg:#f6f3ec;--ink:#1d2c38;--card:#ffffff;--line:#d7d0c3;--muted:#5f7181;--teal:#1bb79f;--blue:#4f98e5;--slate:#2f4a60}
@@ -99,6 +100,15 @@
     </section>
 
     <section class="card" style="margin-bottom:14px">
+      <h2>What You Get Immediately After Payment</h2>
+      <ul>
+        <li>Receipt Layer account activation for your selected plan.</li>
+        <li>API key delivered to billing email for signed receipt creation and verification.</li>
+        <li>Implementation checklist to start compliance evidence capture the same day.</li>
+      </ul>
+    </section>
+
+    <section class="card" style="margin-bottom:14px">
       <h2>Evidence Surfaces (Visual Tabs)</h2>
       <div class="tabs">
         <button class="tabbtn active" data-tab="audit">Audit Trails</button>
@@ -151,6 +161,9 @@
         <input id="company" required placeholder="Company" />
         <select id="plan"><option value="starter">Starter</option><option value="dfy">Done-For-You</option></select>
         <textarea id="scope" class="full" required placeholder="What compliance obligations must your workflow satisfy?"></textarea>
+        <div class="full">
+          <div class="cf-turnstile" data-sitekey="{{TURNSTILE_SITE_KEY}}" data-callback="receiptTurnstileDone"></div>
+        </div>
         <button class="btn btn-main full" type="submit">Continue To Stripe</button>
       </form>
       <div id="status" class="status"></div>
@@ -192,6 +205,20 @@
   </footer>
 
   <script>
+    let turnstileToken = '';
+    function receiptTurnstileDone(token) {
+      turnstileToken = token || '';
+    }
+    async function trackEvent(eventName, plan) {
+      try {
+        await fetch('/api/public/event', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ event: eventName, plan: plan || null, source: 'landing' })
+        });
+      } catch (_) {}
+    }
+
     const tabButtons = document.querySelectorAll('.tabbtn');
     const panels = document.querySelectorAll('.panel');
     tabButtons.forEach((btn) => {
@@ -209,15 +236,18 @@
     const accessStatusEl = document.getElementById('access-status');
     document.getElementById('lead-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const selectedPlan = document.getElementById('plan').value;
       statusEl.textContent = 'Creating secure checkout link...';
       const payload = {
         email: document.getElementById('email').value.trim(),
         company: document.getElementById('company').value.trim(),
         compliance_scope: document.getElementById('scope').value.trim(),
-        plan: document.getElementById('plan').value,
-        source: 'landing_form'
+        plan: selectedPlan,
+        source: 'landing_form',
+        turnstile_token: turnstileToken || null
       };
       try {
+        await trackEvent('checkout_started', selectedPlan);
         const res = await fetch('/api/public/lead', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
         const data = await res.json();
         if (!res.ok || !data.checkout_url) throw new Error(data.detail || 'Unable to create checkout');
@@ -240,10 +270,12 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Unable to request access key');
         accessStatusEl.textContent = 'If your account is active, your key has been sent to your inbox.';
+        trackEvent('activation_completed', null);
       } catch (err) {
         accessStatusEl.textContent = err.message || 'Access key request failed';
       }
     });
+    trackEvent('landing_view', null);
   </script>
 </body>
 </html>
