@@ -73,6 +73,11 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY", "").strip()
 TURNSTILE_SITE_KEY = os.getenv("TURNSTILE_SITE_KEY", "1x00000000000000000000AA").strip()
 TURNSTILE_REQUIRED = os.getenv("TURNSTILE_REQUIRED", "true").strip().lower() in {"1", "true", "yes", "on"}
+UNIVERSAL_PROVISION_KEY = os.getenv("UNIVERSAL_PROVISION_KEY", "").strip()
+BUNDLE_BRIDGE_BASE_URL = os.getenv("BUNDLE_BRIDGE_BASE_URL", "https://dataweaveai.com").strip().rstrip("/")
+BUNDLE_BRIDGE_KEY = os.getenv("BUNDLE_BRIDGE_KEY", "").strip()
+BUNDLE_BRIDGE_TIMEOUT_SECONDS = int(os.getenv("BUNDLE_BRIDGE_TIMEOUT_SECONDS", "8"))
+BUNDLE_TOOL_KEY = os.getenv("BUNDLE_TOOL_KEY", f"{APP_SLUG}_api_call").strip()
 
 if stripe and STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
@@ -123,6 +128,13 @@ class ReceiptVerifyRequest(BaseModel):
 
 class AccessKeyRequest(BaseModel):
     email: str
+
+
+class InternalBundleProvisionRequest(BaseModel):
+    email: str
+    owner_email: Optional[str] = None
+    plan_code: str = Field(default="smb_starter", pattern="^(smb_starter|smb_growth|smb_scale)$")
+    remote_plan: str = Field(default="starter", pattern="^(starter|dfy)$")
 
 
 app = FastAPI(title=APP_NAME, version="1.0.0")
@@ -421,6 +433,44 @@ def verify_turnstile_token(token: Optional[str], ip: str) -> bool:
         return False
 
 
+def consume_bundle_credit_bridge(email: str, units: int = 1) -> tuple[bool, str]:
+    if not BUNDLE_BRIDGE_BASE_URL or not BUNDLE_BRIDGE_KEY:
+        return False, "Bundle bridge is not configured"
+    payload = json.dumps(
+        {
+            "email": normalize_email(email),
+            "tool_key": BUNDLE_TOOL_KEY,
+            "units": units,
+            "metadata": {"app_slug": APP_SLUG},
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        f"{BUNDLE_BRIDGE_BASE_URL}/api/bundle/internal/consume-by-email",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "X-Universal-Provision-Key": BUNDLE_BRIDGE_KEY,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=BUNDLE_BRIDGE_TIMEOUT_SECONDS) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+        if body.get("allowed") is False:
+            return False, body.get("message", "Bundle credits unavailable")
+        return True, ""
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            err = json.loads(e.read().decode("utf-8", errors="ignore"))
+            detail = err.get("detail") or ""
+        except Exception:
+            detail = ""
+        return False, detail or f"Bundle bridge error ({e.code})"
+    except Exception:
+        return False, "Bundle bridge is temporarily unavailable"
+
+
 def render_template(name: str) -> str:
     raw = (LANDING_DIR / name).read_text(encoding="utf-8")
     return (
@@ -676,7 +726,7 @@ def require_paid_access(request: Request) -> sqlite3.Row:
     key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT email, status, plan FROM billing_accounts WHERE api_key_hash = ?",
+            "SELECT email, status, plan, billing_mode FROM billing_accounts WHERE api_key_hash = ?",
             (key_hash,),
         ).fetchone()
 
@@ -689,6 +739,13 @@ def require_paid_access(request: Request) -> sqlite3.Row:
         plan = (row["plan"] or "").strip().lower()
         if plan not in {"starter", "dfy"}:
             raise HTTPException(status_code=402, detail="Paid plan required")
+
+    if (row["billing_mode"] or "").strip().lower() == "bundle":
+        if request.method.upper() != "GET":
+            ok, message = consume_bundle_credit_bridge(row["email"], units=1)
+            if not ok:
+                raise HTTPException(status_code=402, detail=message or "Bundle credits unavailable")
+        return row
 
     enforce_plan_usage_quota(row, units=1)
     return row
@@ -982,6 +1039,45 @@ def request_access_key(payload: AccessKeyRequest, request: Request) -> dict[str,
             )
             send_resend_email(subject=f"{APP_NAME} key rotated", html=f"<p>API key rotated for {email}</p>")
     return {"ok": True, "message": "If an active account exists, an access key email was sent."}
+
+
+@app.post("/v1/internal/provision-bundle-account")
+def internal_provision_bundle_account(payload: InternalBundleProvisionRequest, request: Request) -> dict[str, Any]:
+    provided_key = request.headers.get("x-universal-provision-key", "").strip()
+    valid_keys = {k for k in [UNIVERSAL_PROVISION_KEY, BUNDLE_BRIDGE_KEY] if k}
+    if not valid_keys or provided_key not in valid_keys:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    email = normalize_email(payload.email)
+    if not EMAIL_RE.match(email):
+        raise HTTPException(status_code=400, detail="Invalid email")
+
+    plan = payload.remote_plan if payload.remote_plan in {"starter", "dfy"} else "starter"
+    issued_key = upsert_account(
+        email=email,
+        status="active",
+        plan=plan,
+        billing_mode="bundle",
+        last_event_id=f"bundle:{payload.plan_code}:{int(time.time())}",
+        rotate_api_key=True,
+    )
+    if issued_key:
+        send_resend_email(
+            subject=f"{APP_NAME} bundle access activated",
+            html=(
+                f"<p>Your {APP_NAME} bundle access is now active.</p>"
+                f"<p><strong>API Key:</strong> <code>{issued_key}</code></p>"
+                f"<p>Use this key in the <code>x-api-key</code> header for protected endpoints.</p>"
+            ),
+            to_addresses=[email],
+        )
+    return {
+        "ok": True,
+        "status": "provisioned",
+        "email": email,
+        "plan": plan,
+        "api_key_issued": bool(issued_key),
+    }
 
 
 @app.get("/v1/billing/status")
