@@ -34,7 +34,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 APP_NAME = "Compliance Receipt Layer"
 APP_SLUG = "receiptlayer"
-DEFAULT_BASE_URL = "https://receiptlayer.dataweaveai.com"
+DEFAULT_BASE_URL = "https://complyreceipt.com"
 
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
 FOLLOWUP_INBOX_EMAIL = os.getenv("FOLLOWUP_INBOX_EMAIL", "joseph@dataweaveai.com").strip()
